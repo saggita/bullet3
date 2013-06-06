@@ -6,7 +6,7 @@
 class btRigidBody;
 class btCollisionObject;
 struct b3GpuInternalData;//use this struct to avoid 'leaking' all OpenCL headers into clients code base
-class CLPhysicsDemo;
+//class CLPhysicsDemo;
 class btActionInterface;
 
 #include "LinearMath/btAlignedObjectArray.h"

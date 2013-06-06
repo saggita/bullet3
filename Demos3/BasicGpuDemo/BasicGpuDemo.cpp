@@ -329,9 +329,13 @@ void	BasicGpuDemo::initPhysics()
 		}
 	}
 
+	// softbody
 	
 
 
+
+
+	// transfer data to GPU
 	np->writeAllBodiesToGpu();
 	bp->writeAabbsToGpu();
 	rbp->writeAllInstancesToGpu();
