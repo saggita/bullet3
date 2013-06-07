@@ -8,12 +8,13 @@ class btCollisionObject;
 struct b3GpuInternalData;//use this struct to avoid 'leaking' all OpenCL headers into clients code base
 //class CLPhysicsDemo;
 class btActionInterface;
+class btSoftbodyCL;
 
 #include "LinearMath/btAlignedObjectArray.h"
 #include "BulletDynamics/Dynamics/btDynamicsWorld.h"
+#include "BulletSoftBody/btSoftRigidDynamicsWorld.h"
 
-
-class b3GpuDynamicsWorld : public btDynamicsWorld
+class b3GpuDynamicsWorld : public btSoftRigidDynamicsWorld
 {
 	
 	btAlignedObjectArray<const class  btCollisionShape*> m_uniqueShapes;
@@ -24,6 +25,7 @@ class b3GpuDynamicsWorld : public btDynamicsWorld
 	class b3GpuNarrowPhase* m_np;
 	class b3GpuSapBroadphase* m_bp;
 
+	class btSoftBodySimulationSolverOpenCL* m_softbodySolver;
 	
 	btVector3			m_gravity;
 	bool	m_cpuGpuSync;
@@ -33,7 +35,7 @@ class b3GpuDynamicsWorld : public btDynamicsWorld
 
 	
 public:
-	b3GpuDynamicsWorld(class b3GpuSapBroadphase* bp,class b3GpuNarrowPhase* np, class b3GpuRigidBodyPipeline* rigidBodyPipeline);
+	b3GpuDynamicsWorld(class b3GpuSapBroadphase* bp,class b3GpuNarrowPhase* np, class b3GpuRigidBodyPipeline* rigidBodyPipeline, class btSoftBodySimulationSolverOpenCL* softbodySolverCL);
 
 	virtual ~b3GpuDynamicsWorld();
 
@@ -68,6 +70,9 @@ public:
 	{
 		addRigidBody(body);
 	}
+
+	// I think btSoftRigidDynamicsWorld::addSoftBody and btSoftRigidDynamicsWorld::removeSoftBody should be virtual functions.
+	void addSoftBodyCl(btSoftbodyCL* softBody);
 
 	virtual void	removeRigidBody(btRigidBody* body)
 	{

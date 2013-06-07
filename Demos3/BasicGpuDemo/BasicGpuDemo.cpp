@@ -43,6 +43,8 @@ subject to the following restrictions:
 #include "Bullet3OpenCL/RigidBody/b3GpuRigidBodyPipeline.h"
 #include "Bullet3OpenCL/RigidBody/b3GpuNarrowPhase.h"
 #include "Bullet3OpenCL/RigidBody/b3Config.h"
+#include "Bullet3OpenCL/SoftBody/btSoftBodySimulationSolverOpenCL.h"
+#include "Bullet3OpenCL/SoftBody/btSoftbodyCL.h"
 #include "Bullet3Collision/BroadPhaseCollision/b3DynamicBvhBroadphase.h"
 
 
@@ -215,7 +217,9 @@ void	BasicGpuDemo::initPhysics()
 	
 	b3GpuRigidBodyPipeline* rbp = new b3GpuRigidBodyPipeline(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue, np, bp,broadphaseDbvt);
 
-	m_dynamicsWorld = new b3GpuDynamicsWorld(bp,np,rbp);
+	btSoftBodySimulationSolverOpenCL* sfs = new btSoftBodySimulationSolverOpenCL(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue);
+
+	m_dynamicsWorld = new b3GpuDynamicsWorld(bp,np,rbp,sfs);
 	
 	m_dynamicsWorld->setDebugDrawer(&gDebugDraw);
 	
@@ -331,7 +335,26 @@ void	BasicGpuDemo::initPhysics()
 
 	// softbody
 	
+	if ( 1 )
+	{
+		btSoftbodyCL* pCloth = new btSoftbodyCL();
+		//assert(pCloth->Load("..\\..\\bin\\circle2723.obj"));
+		assert(pCloth->Load("F:\\My Programming 4\\experiments\\bin\\circle14200.obj"));
+		pCloth->SetVertexMass(1.0f);
+		pCloth->TranslateW(0.0f, 15.0f, 0.0f);
+		pCloth->SetGravity(btVector3(0, -9.8, 0));
+		pCloth->SetKb(0.45f); 
+		pCloth->SetKst(0.995f); 
+		pCloth->SetFrictionCoef(0.5f);
+		pCloth->SetNumIterForConstraintSolver(7);
+		pCloth->SetMargin(0.1f);
+		pCloth->GetVertexArray()[0].m_InvMass = 0;
+		pCloth->GetVertexArray()[0].m_Vel = btVector3(3.0f, 0, 0);
+		pCloth->Initialize();
 
+
+		((b3GpuDynamicsWorld*)m_dynamicsWorld)->addSoftBodyCl(pCloth);		
+	}
 
 
 

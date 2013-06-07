@@ -1,12 +1,14 @@
 #pragma once
 
-#include "CLFunctions.h"
+//#include "CLFunctions.h"
+
+#include "../Initialize/b3OpenCLInclude.h"
 
 #include "LinearMath\btVector3.h"
 #include "LinearMath\btAlignedObjectArray.h"
 #include "..\NarrowphaseCollision\b3ConvexPolyhedronCL.h"
 
-struct CLPhysicsDemo;
+//struct CLPhysicsDemo;
 class btSoftbodyCL;
 struct float4;
 struct float4s;
@@ -18,11 +20,11 @@ struct btSoftBodyLinkCL;
 class btSoftBodySimulationSolverOpenCL
 {
 public:
-	btSoftBodySimulationSolverOpenCL(CLPhysicsDemo* gpuPhysics);
+	btSoftBodySimulationSolverOpenCL(cl_context ctx, cl_device_id device, cl_command_queue  q);
 	virtual ~btSoftBodySimulationSolverOpenCL(void);
 
 	btSoftbodyCL* m_pMergedSoftBody;
-	CLPhysicsDemo*		m_gpuPhysics;
+	//CLPhysicsDemo*		m_gpuPhysics;
 
 protected:
 	btAlignedObjectArray<btSoftbodyCL*> m_clothArray;
@@ -40,6 +42,10 @@ protected:
 	btAlignedObjectArray<int> m_BatchBendSpringIndexGlobalArray; // index is global
 	void GenerateBatches(bool bBatchEachSoftBodyFirst = false); 
 	void mergeSoftBodies();
+
+	cl_context				m_context;
+	cl_device_id			m_device;
+	cl_command_queue		m_queue;
 
 	cl_mem m_DBVertices;
 	cl_mem m_DBStrechSprings;
@@ -69,7 +75,7 @@ protected:
 	cl_kernel m_UpdateClothBoundingVolumeKernel;
 	cl_kernel m_ResolveCollisionKernel;
 
-	CLFunctions m_clFunctions;
+	//CLFunctions m_clFunctions;
 		
 	int getVertexIndexGlobal(int vertexIndexLocal, int clothIndex);
 	int getStretchSpringIndexGlobal(int stretchSpringIndexLocal, int clothIndex);

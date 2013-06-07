@@ -2,10 +2,12 @@
 #include "btSoftbodyCL.h"
 #include "../RigidBody/b3GpuNarrowPhase.h"
 
-#define MSTRINGIFY(A) #A
+#include "Bullet3OpenCL/Initialize/b3OpenCLInclude.h"
+#include "Bullet3OpenCL/Initialize/b3OpenCLUtils.h"
+#include "kernels/SoftBodyKernals.h"
 
-static const char* SoftBodyCLString = "";
-//#include "SoftBodyKernals.cl"
+
+#define B3_SOFTBODY_KERNELS_PATH "src/Bullet3OpenCL/SoftBody/kernels/SoftBodyKernals.cl"
 	
 #define _MEM_CLASSALIGN16 __declspec(align(16))
 #define _MEM_ALIGNED_ALLOCATOR16 	void* operator new(size_t size) { return _aligned_malloc( size, 16 ); } \
@@ -119,18 +121,19 @@ inline float clamp(float val, float low, float high)
 	return val;
 }
 
-extern cl_context        g_cxMainContext;
-extern cl_command_queue  g_cqCommandQue;
-
 extern b3GpuNarrowPhase* narrowphaseAndSolver;
 
 #define RELEASE_CL_KERNEL(kernelName) {if( kernelName ){ clReleaseKernel( kernelName ); kernelName = 0; }}
 
-btSoftBodySimulationSolverOpenCL::btSoftBodySimulationSolverOpenCL(CLPhysicsDemo* gpuPhysics) : m_bBuildCLKernels(false), m_HBVertexCL(NULL), m_HBStretchSpringCL(NULL), m_HBBendSpringCL(NULL),
-	                                                                       m_HBClothInfoCL(NULL), m_DBVertices(NULL), m_DBStrechSprings(NULL), m_DBBendSprings(NULL), 
-																		   m_DBClothInfo(NULL), m_pMergedSoftBody(NULL), m_HBLinkCL(NULL), m_gpuPhysics(gpuPhysics)
-						   
+btSoftBodySimulationSolverOpenCL::btSoftBodySimulationSolverOpenCL(cl_context ctx, cl_device_id device, cl_command_queue  q) : 
+m_context(ctx),
+m_device(device),
+m_queue(q),
+m_bBuildCLKernels(false), m_HBVertexCL(NULL), m_HBStretchSpringCL(NULL), m_HBBendSpringCL(NULL),
+m_HBClothInfoCL(NULL), m_DBVertices(NULL), m_DBStrechSprings(NULL), m_DBBendSprings(NULL), 
+m_DBClothInfo(NULL), m_pMergedSoftBody(NULL), m_HBLinkCL(NULL)
 {
+
 	m_ClearForcesKernel = NULL;
 	m_ComputeNextVertexPositionsKernel = NULL;
 	m_ApplyGravityKernel = NULL;
@@ -194,9 +197,9 @@ void btSoftBodySimulationSolverOpenCL::addSoftBody(btSoftbodyCL* pCloth)
 
 void btSoftBodySimulationSolverOpenCL::Initialize()
 {
-	m_clFunctions.m_cxMainContext = g_cxMainContext;
-	m_clFunctions.m_cqCommandQue = g_cqCommandQue;
-		
+	if ( m_numVertices == 0 )
+		return;
+
 	BuildCLKernels();
 
 	//-------------------------------------
@@ -219,25 +222,25 @@ void btSoftBodySimulationSolverOpenCL::Initialize()
 	// Buffer for vertices
 	//---------------------
 	m_HBVertexCL = new btSoftBodyVertexCL[m_numVertices];
-	m_DBVertices = clCreateBuffer(g_cxMainContext, CL_MEM_READ_WRITE, sizeof(btSoftBodyVertexCL) * m_numVertices, NULL, NULL);
+	m_DBVertices = clCreateBuffer(m_context, CL_MEM_READ_WRITE, sizeof(btSoftBodyVertexCL) * m_numVertices, NULL, NULL);
 
 	//----------------------------
 	// Buffer for stretch springs
 	//----------------------------
 	m_HBStretchSpringCL = new btSoftBodySpringCL[m_numStretchSprings];	
-	m_DBStrechSprings = clCreateBuffer(g_cxMainContext, CL_MEM_READ_WRITE, sizeof(btSoftBodySpringCL) * m_numStretchSprings, NULL, NULL);
+	m_DBStrechSprings = clCreateBuffer(m_context, CL_MEM_READ_WRITE, sizeof(btSoftBodySpringCL) * m_numStretchSprings, NULL, NULL);
 
 	//----------------------------
 	// Buffer for bending springs
 	//----------------------------
 	m_HBBendSpringCL = new btSoftBodySpringCL[m_numBendingSprings];	
-	m_DBBendSprings = clCreateBuffer(g_cxMainContext, CL_MEM_READ_WRITE, sizeof(btSoftBodySpringCL) * m_numBendingSprings, NULL, NULL);
+	m_DBBendSprings = clCreateBuffer(m_context, CL_MEM_READ_WRITE, sizeof(btSoftBodySpringCL) * m_numBendingSprings, NULL, NULL);
 
 	//-----------------------
 	// Buffer for cloth info
 	//-----------------------
 	m_HBClothInfoCL = new btSoftBodyInfoCL[m_numClothes];	
-	m_DBClothInfo = clCreateBuffer(g_cxMainContext, CL_MEM_READ_WRITE, sizeof(btSoftBodyInfoCL) * m_numClothes, NULL, NULL);
+	m_DBClothInfo = clCreateBuffer(m_context, CL_MEM_READ_WRITE, sizeof(btSoftBodyInfoCL) * m_numClothes, NULL, NULL);
 
 	InitializeBoundingVolumes();
 	mergeSoftBodies();
@@ -437,7 +440,7 @@ void btSoftBodySimulationSolverOpenCL::UpdateBuffers()
 	//-----------------------
 	// Buffer for cloth info
 	//-----------------------
-	result = clEnqueueWriteBuffer(g_cqCommandQue, m_DBClothInfo, CL_TRUE, 0, sizeof(btSoftBodyInfoCL) * m_numClothes, m_HBClothInfoCL, 0, NULL, NULL);
+	result = clEnqueueWriteBuffer(m_queue, m_DBClothInfo, CL_TRUE, 0, sizeof(btSoftBodyInfoCL) * m_numClothes, m_HBClothInfoCL, 0, NULL, NULL);
 	assert(result == CL_SUCCESS);
 
 	//---------------------
@@ -460,7 +463,7 @@ void btSoftBodySimulationSolverOpenCL::UpdateBuffers()
 		m_HBVertexCL[i] = vertexData;
 	}		
 	
-	result = clEnqueueWriteBuffer(g_cqCommandQue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
+	result = clEnqueueWriteBuffer(m_queue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
 	assert(result == CL_SUCCESS);	
 
 	//----------------------------
@@ -481,7 +484,7 @@ void btSoftBodySimulationSolverOpenCL::UpdateBuffers()
 		m_HBStretchSpringCL[i] = springDataCL;
 	}
 
-	result = clEnqueueWriteBuffer(g_cqCommandQue, m_DBStrechSprings, CL_TRUE, 0, sizeof(btSoftBodySpringCL) * m_numStretchSprings, m_HBStretchSpringCL, 0, NULL, NULL);
+	result = clEnqueueWriteBuffer(m_queue, m_DBStrechSprings, CL_TRUE, 0, sizeof(btSoftBodySpringCL) * m_numStretchSprings, m_HBStretchSpringCL, 0, NULL, NULL);
 	assert(result == CL_SUCCESS);
 
 	//----------------------------
@@ -502,7 +505,7 @@ void btSoftBodySimulationSolverOpenCL::UpdateBuffers()
 		m_HBBendSpringCL[i] = springDataCL;
 	}
 		
-	result = clEnqueueWriteBuffer(g_cqCommandQue, m_DBBendSprings, CL_TRUE, 0, sizeof(btSoftBodySpringCL) * m_numBendingSprings, m_HBBendSpringCL, 0, NULL, NULL);
+	result = clEnqueueWriteBuffer(m_queue, m_DBBendSprings, CL_TRUE, 0, sizeof(btSoftBodySpringCL) * m_numBendingSprings, m_HBBendSpringCL, 0, NULL, NULL);
 	assert(result == CL_SUCCESS);
 }
 
@@ -540,7 +543,7 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_ClearForcesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_ClearForcesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 	
 	//-------------------
@@ -560,7 +563,7 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_ApplyGravityKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_ApplyGravityKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 
 	//------------------
@@ -577,7 +580,7 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_ApplyForcesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_ApplyForcesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 
 	//-------------------
@@ -594,7 +597,7 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_ClearForcesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_ClearForcesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 
 	//----------------------------------
@@ -611,7 +614,7 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_ComputeNextVertexPositionsKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_ComputeNextVertexPositionsKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 
 	//-------------------------------
@@ -658,10 +661,10 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 			size_t m_defaultWorkGroupSize = 64;
 			size_t numWorkItems = m_defaultWorkGroupSize*((numSpringsInBatch + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-			clEnqueueNDRangeKernel(g_cqCommandQue, m_EnforceEdgeConstraintsKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+			clEnqueueNDRangeKernel(m_queue, m_EnforceEdgeConstraintsKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 		}
 	
-		clFinish(g_cqCommandQue);
+		clFinish(m_queue);
 
 		// bending springs
 		springType = 1; // bending
@@ -685,10 +688,10 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 			size_t m_defaultWorkGroupSize = 64;
 			size_t numWorkItems = m_defaultWorkGroupSize*((numSpringsInBatch + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-			clEnqueueNDRangeKernel(g_cqCommandQue, m_EnforceEdgeConstraintsKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+			clEnqueueNDRangeKernel(m_queue, m_EnforceEdgeConstraintsKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 		}
 
-		clFinish(g_cqCommandQue);
+		clFinish(m_queue);
 			
 		++numIteration;
 	}
@@ -707,7 +710,7 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_UpdateVelocitiesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_UpdateVelocitiesKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 
 	return true;
@@ -715,6 +718,9 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 
 bool btSoftBodySimulationSolverOpenCL::AdvancePosition(float dt)
 {	
+	if ( m_numVertices == 0 )
+		return true;
+
 	//-----------------------
 	// AdvancePositionKernel
 	//-----------------------
@@ -729,7 +735,7 @@ bool btSoftBodySimulationSolverOpenCL::AdvancePosition(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_AdvancePositionKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_AdvancePositionKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 
 	return true;
@@ -737,6 +743,9 @@ bool btSoftBodySimulationSolverOpenCL::AdvancePosition(float dt)
 
 bool btSoftBodySimulationSolverOpenCL::ResolveCollision(float dt)
 {
+	if ( m_numVertices == 0 )
+		return true;
+
 	//const CustomDispatchData* narrowphaseData = narrowphaseAndSolver->getCustomDispatchData();
 
 	//cl_mem bodies = narrowphaseData->m_bodyBufferGPU->getBufferCL();
@@ -769,7 +778,7 @@ bool btSoftBodySimulationSolverOpenCL::ResolveCollision(float dt)
 	//	size_t m_defaultWorkGroupSize = 64;
 	//	size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-	//	clEnqueueNDRangeKernel(g_cqCommandQue, m_ResolveCollisionKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+	//	clEnqueueNDRangeKernel(m_queue, m_ResolveCollisionKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	//}
 
 	return true;
@@ -891,7 +900,7 @@ bool btSoftBodySimulationSolverOpenCL::ResolveCollisionCPU(float dt)
 	//	
 	//}
 
-	//cl_int result = clEnqueueWriteBuffer(g_cqCommandQue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
+	//cl_int result = clEnqueueWriteBuffer(m_queue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
 	//assert(result == CL_SUCCESS);
 
 	return true;
@@ -899,17 +908,20 @@ bool btSoftBodySimulationSolverOpenCL::ResolveCollisionCPU(float dt)
 
 bool btSoftBodySimulationSolverOpenCL::ReadBackFromGPU()
 {
+	if ( m_numVertices == 0 )
+		return true;
+
 	//------------------------
 	// Read data back to CPU
 	//------------------------
-	clFinish(g_cqCommandQue);
+	clFinish(m_queue);
 
 	{
-		cl_int ciErrNum = clEnqueueReadBuffer(g_cqCommandQue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
+		cl_int ciErrNum = clEnqueueReadBuffer(m_queue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
 	}
 	
 	{		
-		cl_int ciErrNum = clEnqueueReadBuffer(g_cqCommandQue, m_DBClothInfo, CL_TRUE, 0, sizeof(btSoftBodyInfoCL) * m_numClothes, m_HBClothInfoCL, 0, NULL, NULL);
+		cl_int ciErrNum = clEnqueueReadBuffer(m_queue, m_DBClothInfo, CL_TRUE, 0, sizeof(btSoftBodyInfoCL) * m_numClothes, m_HBClothInfoCL, 0, NULL, NULL);
 	}
 
 	// TODO: Even though ciErrNum is 0, the following line doesn't work. 
@@ -965,6 +977,9 @@ void btSoftBodySimulationSolverOpenCL::InitializeBoundingVolumes()
 
 void btSoftBodySimulationSolverOpenCL::UpdateBoundingVolumes(float dt)
 {	
+	if ( m_numVertices == 0 )
+		return;
+
 	//----------------------------------
 	// UpdateVertexBoundingVolumeKernel
 	//----------------------------------
@@ -980,13 +995,13 @@ void btSoftBodySimulationSolverOpenCL::UpdateBoundingVolumes(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_UpdateVertexBoundingVolumeKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_UpdateVertexBoundingVolumeKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 
 	//---------------------------------
 	// UpdateClothBoundingVolumeKernel
 	//---------------------------------
-	clFinish(g_cqCommandQue);
+	clFinish(m_queue);
 	
 	{
 		cl_int ciErrNum;	
@@ -999,7 +1014,7 @@ void btSoftBodySimulationSolverOpenCL::UpdateBoundingVolumes(float dt)
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numClothes + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
 
-		clEnqueueNDRangeKernel(g_cqCommandQue, m_UpdateClothBoundingVolumeKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
+		clEnqueueNDRangeKernel(m_queue, m_UpdateClothBoundingVolumeKernel, 1, NULL, &numWorkItems, &m_defaultWorkGroupSize, 0,0,0);
 	}
 }
 
@@ -1027,7 +1042,7 @@ bool btSoftBodySimulationSolverOpenCL::BuildCLKernels()
 
 	ReleaseKernels();
 
-	m_clFunctions.clearKernelCompilationFailures();
+	/*m_clFunctions.clearKernelCompilationFailures();
 
 	m_ClearForcesKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ClearForcesKernel");
 	m_ComputeNextVertexPositionsKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ComputeNextVertexPositionsKernel");
@@ -1041,7 +1056,26 @@ bool btSoftBodySimulationSolverOpenCL::BuildCLKernels()
 	m_ResolveCollisionKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ResolveCollisionKernel");
 
 	if( m_clFunctions.getKernelCompilationFailures()==0 )
-		m_bBuildCLKernels = true;
+		m_bBuildCLKernels = true;*/
+
+	const char* softbodyKernelsSrc = SoftBodyKernals;
+	cl_int errNum=0;
+
+	cl_program clProg = b3OpenCLUtils::compileCLProgramFromString(m_context,m_device,softbodyKernelsSrc,&errNum,"",B3_SOFTBODY_KERNELS_PATH);
+	b3Assert(errNum==CL_SUCCESS);
+
+	m_ClearForcesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ClearForcesKernel",&errNum,clProg );
+	m_ComputeNextVertexPositionsKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ComputeNextVertexPositionsKernel",&errNum,clProg );
+	m_ApplyGravityKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ApplyGravityKernel",&errNum,clProg );
+	m_ApplyForcesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ApplyForcesKernel",&errNum,clProg );
+	m_EnforceEdgeConstraintsKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "EnforceEdgeConstraintsKernel",&errNum,clProg );
+	m_UpdateVelocitiesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateVelocitiesKernel",&errNum,clProg );
+	m_AdvancePositionKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "AdvancePositionKernel",&errNum,clProg );
+	m_UpdateVertexBoundingVolumeKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateVertexBoundingVolumeKernel",&errNum,clProg );
+	m_UpdateClothBoundingVolumeKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateClothBoundingVolumeKernel",&errNum,clProg );
+	m_ResolveCollisionKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ResolveCollisionKernel",&errNum,clProg );
+
+	m_bBuildCLKernels = true;
 
 	return m_bBuildCLKernels;
 }

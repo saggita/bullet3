@@ -8,6 +8,8 @@
 #include "BulletCollision/CollisionShapes/btCompoundShape.h"
 #include "BulletCollision/CollisionShapes/btSphereShape.h"
 #include "BulletCollision/CollisionShapes/btStaticPlaneShape.h"
+#include "Bullet3OpenCL/SoftBody/btSoftBodySimulationSolverOpenCL.h"
+#include "Bullet3OpenCL/SoftBody/btSoftbodyCL.h"
 
 #include "LinearMath/btQuickprof.h"
 #include "Bullet3OpenCL/BroadphaseCollision/b3GpuSapBroadphase.h"
@@ -23,20 +25,26 @@
 
 
 
-b3GpuDynamicsWorld::b3GpuDynamicsWorld(class b3GpuSapBroadphase* bp,class b3GpuNarrowPhase* np, class b3GpuRigidBodyPipeline* rigidBodyPipeline)
-	:btDynamicsWorld(0,0,0),
+b3GpuDynamicsWorld::b3GpuDynamicsWorld(class b3GpuSapBroadphase* bp,class b3GpuNarrowPhase* np, class b3GpuRigidBodyPipeline* rigidBodyPipeline, class btSoftBodySimulationSolverOpenCL* softbodySolverCL)
+	:btSoftRigidDynamicsWorld(NULL, NULL, NULL, NULL),
 	m_gravity(0,-10,0),
 m_cpuGpuSync(true),
 m_bp(bp),
 m_np(np),
-m_rigidBodyPipeline(rigidBodyPipeline)
+m_rigidBodyPipeline(rigidBodyPipeline),
+m_softbodySolver(softbodySolverCL)
 {
 
 }
 
 b3GpuDynamicsWorld::~b3GpuDynamicsWorld()
 {
-	
+	// TODO: Should be done in other place..
+	if ( m_softbodySolver )
+	{
+		delete m_softbodySolver;
+		m_softbodySolver = NULL;
+	}
 }
 
 
@@ -60,6 +68,8 @@ int		b3GpuDynamicsWorld::stepSimulation( btScalar timeStep, int maxSubSteps, btS
 		m_np->writeAllBodiesToGpu();
 		m_bp->writeAabbsToGpu();
 		m_rigidBodyPipeline->writeAllInstancesToGpu();
+
+		m_softbodySolver->Initialize();
 	}
 
 	// dispatch preTick callback
@@ -68,6 +78,15 @@ int		b3GpuDynamicsWorld::stepSimulation( btScalar timeStep, int maxSubSteps, btS
 	}	
 
 	m_rigidBodyPipeline->stepSimulation(fixedTimeStep);
+
+	// simulate softbodies
+	m_softbodySolver->Integrate(timeStep);
+	m_softbodySolver->AdvancePosition(timeStep);
+	m_softbodySolver->UpdateBoundingVolumes(timeStep);
+	m_softbodySolver->ResolveCollision(timeStep);
+	//m_softbodySolver->ResolveCollisionCPU(timeStep);
+	m_softbodySolver->ReadBackFromGPU();
+
 
 	{
 		{
@@ -306,6 +325,15 @@ void	b3GpuDynamicsWorld::addRigidBody(btRigidBody* body)
 		m_collisionObjects.push_back(body);
 		//btDynamicsWorld::addCollisionObject(
 	}
+}
+
+void    b3GpuDynamicsWorld::addSoftBodyCl(btSoftbodyCL* softBody)
+{
+	//const CAabb& aabb = softBody->GetAabb();
+	//btVector3 aabbMin(aabb.Min()[0], aabb.Min()[1], aabb.Min()[2]);
+	//btVector3 aabbMax(aabb.Max()[0], aabb.Max()[1], aabb.Max()[2]);
+	
+	m_softbodySolver->addSoftBody(softBody);
 }
 
 void	b3GpuDynamicsWorld::removeCollisionObject(btCollisionObject* colObj)

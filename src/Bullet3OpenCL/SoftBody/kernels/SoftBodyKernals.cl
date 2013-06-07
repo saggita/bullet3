@@ -1,4 +1,4 @@
-﻿//#pragma OPENCL EXTENSION cl_amd_printf : enable\n
+
 
 // From MathCl.h
 typedef unsigned int u32;
