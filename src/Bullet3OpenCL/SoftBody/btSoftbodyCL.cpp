@@ -8,6 +8,7 @@
 #include "btSoftbodyCL.h"
 #include "StringTokenizer.h"
 #include "btSoftbodyTriangleCL.h"
+#include "../BulletSoftBody/btSoftBody.h"
 
 inline float clamp(float val, float low, float high)
 {
@@ -21,8 +22,7 @@ inline float clamp(float val, float low, float high)
 
 using namespace std;
 
-
-btSoftbodyCL::btSoftbodyCL(void) : m_bDeformable(true), m_Gravity(0.0f, -9.8f, 0.0f), m_dt(0.0f), m_bShowBV(false), m_Margin(0.01)
+btSoftbodyCL::btSoftbodyCL() : m_pSoftBodyCPU(NULL), m_bDeformable(true), m_Gravity(0.0f, -9.8f, 0.0f), m_dt(0.0f), m_bShowBV(false), m_Margin(0.01)
 {
 	m_Kst = 0.95f;
 	m_Kb = 0.4f;
@@ -34,6 +34,48 @@ btSoftbodyCL::btSoftbodyCL(void) : m_bDeformable(true), m_Gravity(0.0f, -9.8f, 0
 
 	 m_numBatchStretchSpring = 0;
 	 m_numBatchBendingSpring = 0;
+}
+
+btSoftbodyCL::btSoftbodyCL(btSoftBody* softbody) : m_pSoftBodyCPU(softbody), m_bDeformable(true), m_Gravity(0.0f, -9.8f, 0.0f), m_dt(0.0f), m_bShowBV(false), m_Margin(0.01)
+{
+	assert(softbody);
+
+	m_Kst = 0.95f;
+	m_Kb = 0.4f;
+	m_Kd = 0.0f;
+	m_Mu = 0.3f;
+	
+	m_bEqualVertexMass = true;
+	m_NumIterForConstraintSolver = 7;
+
+	 m_numBatchStretchSpring = 0;
+	 m_numBatchBendingSpring = 0;
+		
+	 // nodes
+	 int index = 0;
+	 for ( int i = 0; i < softbody->m_nodes.size(); i++ )
+	 {
+		btSoftbodyNodeCL nodeCl;
+		nodeCl.m_Index = index++;
+		nodeCl.m_Pos = softbody->m_nodes[i].m_x;
+		nodeCl.m_InvMass = softbody->m_nodes[i].m_im;
+		softbody->m_nodes[i].m_tag = (void*)nodeCl.m_Index;
+		m_VertexArray.push_back(nodeCl);
+	 }
+	
+	 // faces
+	 for ( int i = 0; i < softbody->m_faces.size(); i++ )
+	 {
+		 btSoftbodyTriangleCL faceCl;
+
+		 faceCl.SetVertexIndex(0, (int)softbody->m_faces[i].m_n[0]->m_tag);
+		 faceCl.SetVertexIndex(1, (int)softbody->m_faces[i].m_n[1]->m_tag);
+		 faceCl.SetVertexIndex(2, (int)softbody->m_faces[i].m_n[2]->m_tag);
+		 faceCl.m_Index = (int)m_TriangleArray.size();
+		 m_TriangleArray.push_back(faceCl);
+	 }
+	
+	FillSpringArray();
 }
 
 btSoftbodyCL::btSoftbodyCL(const btSoftbodyCL& other)
@@ -1170,6 +1212,17 @@ void btSoftbodyCL::TranslateW(float x, float y, float z)
 				
 		vert.m_Pos += btVector3(x, y, z);
 	}
+}
+
+void btSoftbodyCL::UpdateSoftBodyCPU()
+{
+	if ( !m_pSoftBodyCPU )
+		return;
+
+	for ( int i = 0; i < m_pSoftBodyCPU->m_nodes.size(); i++ )
+	 {
+		m_pSoftBodyCPU->m_nodes[i].m_x = m_VertexArray[i].m_Pos;
+	 }
 }
 
 btSoftbodyCL& btSoftbodyCL::operator=(const btSoftbodyCL& other) 

@@ -434,6 +434,9 @@ void btSoftBodySimulationSolverOpenCL::GenerateBatches(bool bBatchEachSoftBodyFi
 
 void btSoftBodySimulationSolverOpenCL::UpdateBuffers()
 {
+	if ( m_numVertices == 0 )
+		return;
+
 	assert(m_pMergedSoftBody != NULL);
 	cl_int result;
 
@@ -945,6 +948,8 @@ bool btSoftBodySimulationSolverOpenCL::ReadBackFromGPU()
 			pCloth->m_AABBVertexArray[j].Min() = btVector3(vertexData.m_AABBMin.x, vertexData.m_AABBMin.y, vertexData.m_AABBMin.z);
 			pCloth->m_AABBVertexArray[j].Max() = btVector3(vertexData.m_AABBMax.x, vertexData.m_AABBMax.y, vertexData.m_AABBMax.z);
 		}
+
+		pCloth->UpdateSoftBodyCPU();
 
 		pCloth->m_Aabb.Min() = TobtVector3(m_HBClothInfoCL[i].m_AABBMin);
 		pCloth->m_Aabb.Max() = TobtVector3(m_HBClothInfoCL[i].m_AABBMax);

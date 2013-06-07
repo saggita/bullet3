@@ -13,6 +13,7 @@
 
 class btVector3;
 class btSoftbodyTriangleCL;
+class btSoftBody;
 
 class btSoftbodyLinkCL
 {
@@ -155,7 +156,8 @@ public:
 class btSoftbodyCL
 {
 public:
-	btSoftbodyCL(void);
+	btSoftbodyCL();
+	btSoftbodyCL(btSoftBody* softbody);
 	btSoftbodyCL(const btSoftbodyCL& other);
 	virtual ~btSoftbodyCL(void);
 
@@ -186,6 +188,8 @@ public:
 	int m_numBatchBendingSpring;
 	
 protected:	
+	btSoftBody* m_pSoftBodyCPU;
+
 	// for debug
 	bool m_bShowBV; // toggle showing bounding volume
 	
@@ -257,6 +261,8 @@ public:
 	virtual void UpdateBoundingVolumes(float dt);
 
 	virtual void TranslateW(float x, float y, float z);
+
+	void UpdateSoftBodyCPU();
 
 protected:
 	void FillSpringArray();
