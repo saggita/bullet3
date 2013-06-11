@@ -163,7 +163,7 @@ btSoftBodySimulationSolverOpenCL::~btSoftBodySimulationSolverOpenCL(void)
 	if ( m_DBClothInfo )
 		clReleaseMemObject(m_DBClothInfo);
 
-	ReleaseKernels();	
+	releaseKernels();	
 	
 	if ( m_HBVertexCL )
 		delete [] m_HBVertexCL;
@@ -189,18 +189,44 @@ btSoftBodySimulationSolverOpenCL::~btSoftBodySimulationSolverOpenCL(void)
 
 void btSoftBodySimulationSolverOpenCL::addSoftBody(btSoftbodyCL* pCloth) 
 { 
-	btSoftbodyCL* pNewSoftBody = new btSoftbodyCL(*pCloth);
-	m_tempClothArray.push_back(pNewSoftBody);
-
 	m_clothArray.push_back(pCloth); 
 }
 
-void btSoftBodySimulationSolverOpenCL::Initialize()
+bool btSoftBodySimulationSolverOpenCL::buildCLKernels()
+{
+	if ( m_bBuildCLKernels )
+		return true;
+
+	releaseKernels();
+
+	const char* softbodyKernelsSrc = SoftBodyKernals;
+	cl_int errNum=0;
+
+	cl_program clProg = b3OpenCLUtils::compileCLProgramFromString(m_context,m_device,softbodyKernelsSrc,&errNum,"",B3_SOFTBODY_KERNELS_PATH);
+	b3Assert(errNum==CL_SUCCESS);
+
+	m_ClearForcesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ClearForcesKernel",&errNum,clProg );
+	m_ComputeNextVertexPositionsKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ComputeNextVertexPositionsKernel",&errNum,clProg );
+	m_ApplyGravityKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ApplyGravityKernel",&errNum,clProg );
+	m_ApplyForcesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ApplyForcesKernel",&errNum,clProg );
+	m_EnforceEdgeConstraintsKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "EnforceEdgeConstraintsKernel",&errNum,clProg );
+	m_UpdateVelocitiesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateVelocitiesKernel",&errNum,clProg );
+	m_AdvancePositionKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "AdvancePositionKernel",&errNum,clProg );
+	m_UpdateVertexBoundingVolumeKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateVertexBoundingVolumeKernel",&errNum,clProg );
+	m_UpdateClothBoundingVolumeKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateClothBoundingVolumeKernel",&errNum,clProg );
+	m_ResolveCollisionKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ResolveCollisionKernel",&errNum,clProg );
+
+	m_bBuildCLKernels = true;
+
+	return m_bBuildCLKernels;
+}
+
+void btSoftBodySimulationSolverOpenCL::initialize()
 {
 	if ( m_numVertices == 0 )
 		return;
 
-	BuildCLKernels();
+	buildCLKernels();
 
 	//-------------------------------------
 	// Count vertices, springs and clothes
@@ -213,9 +239,9 @@ void btSoftBodySimulationSolverOpenCL::Initialize()
 	for ( int i = 0; i < m_numClothes; i++ )
 	{
 		const btSoftbodyCL* pCloth = m_clothArray[i];
-		m_numVertices += pCloth->GetVertexArray().size();
-		m_numStretchSprings += pCloth->GetStrechSpringArray().size();
-		m_numBendingSprings += pCloth->GetBendSpringArray().size();
+		m_numVertices += pCloth->getVertexArray().size();
+		m_numStretchSprings += pCloth->getStrechSpringArray().size();
+		m_numBendingSprings += pCloth->getBendSpringArray().size();
 	}
 
 	//---------------------
@@ -242,10 +268,10 @@ void btSoftBodySimulationSolverOpenCL::Initialize()
 	m_HBClothInfoCL = new btSoftBodyInfoCL[m_numClothes];	
 	m_DBClothInfo = clCreateBuffer(m_context, CL_MEM_READ_WRITE, sizeof(btSoftBodyInfoCL) * m_numClothes, NULL, NULL);
 
-	InitializeBoundingVolumes();
+	initializeBoundingVolumes();
 	mergeSoftBodies();
-	GenerateBatches();
-	UpdateBuffers();
+	generateBatches();
+	updateBuffers();
 
 	// We don't need m_pMergedSoftBody anymore.
 	/*if ( m_pMergedSoftBody )
@@ -257,6 +283,16 @@ void btSoftBodySimulationSolverOpenCL::Initialize()
 
 void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 {
+	if ( m_clothArray.size() == 0 )
+		return;
+
+	// create temporary softbody objects to make one merged softbody.
+	for ( int i = 0; i < m_clothArray.size(); i++ )
+	{
+		btSoftbodyCL* pNewSoftBody = new btSoftbodyCL(*m_clothArray[i]);
+		m_tempClothArray.push_back(pNewSoftBody);
+	}
+
 	m_HBClothInfoCL = new btSoftBodyInfoCL[m_numClothes];	
 
 	unsigned int offsetVertices = 0;
@@ -280,9 +316,9 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 		m_HBClothInfoCL[i].m_AABBMin = ToFloat4s(pCloth->m_Aabb.Min());
 		m_HBClothInfoCL[i].m_AABBMax = ToFloat4s(pCloth->m_Aabb.Max());
 
-		m_HBClothInfoCL[i].m_Margin = pCloth->GetMargin();
-		m_HBClothInfoCL[i].m_Kst = pCloth->GetKst();
-		m_HBClothInfoCL[i].m_Kb = pCloth->GetKb();
+		m_HBClothInfoCL[i].m_Margin = pCloth->getMargin();
+		m_HBClothInfoCL[i].m_Kst = pCloth->getKst();
+		m_HBClothInfoCL[i].m_Kb = pCloth->getKb();
 
 		offsetVertices += pCloth->m_VertexArray.size();
 		offsetStretchSprings += pCloth->m_StrechSpringArray.size();
@@ -294,10 +330,10 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 		btSoftbodyCL* pCloth = m_tempClothArray[clothIndex];
 
 		// vertices
-		for ( int vertIndexLocal = 0; vertIndexLocal < pCloth->GetVertexArray().size(); vertIndexLocal++ )
+		for ( int vertIndexLocal = 0; vertIndexLocal < pCloth->getVertexArray().size(); vertIndexLocal++ )
 		{
 			// vertex index
-			btSoftbodyNodeCL& vert = pCloth->GetVertexArray()[vertIndexLocal];
+			btSoftbodyNodeCL& vert = pCloth->getVertexArray()[vertIndexLocal];
 			assert(vert.m_Index == vertIndexLocal);
 			vert.m_Index = getVertexIndexGlobal(vert.m_Index, clothIndex);
 
@@ -317,10 +353,10 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 		}
 
 		// stretch springs
-		for ( int stretchIndexLocal = 0; stretchIndexLocal < pCloth->GetStrechSpringArray().size(); stretchIndexLocal++ )
+		for ( int stretchIndexLocal = 0; stretchIndexLocal < pCloth->getStrechSpringArray().size(); stretchIndexLocal++ )
 		{
 			// spring index
-			btSoftbodyLinkCL& spring = pCloth->GetStrechSpringArray()[stretchIndexLocal];
+			btSoftbodyLinkCL& spring = pCloth->getStrechSpringArray()[stretchIndexLocal];
 			spring.SetIndex(getStretchSpringIndexGlobal(spring.GetIndex(), clothIndex));
 
 			// connected two vertex indexes
@@ -329,10 +365,10 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 		}
 
 		// bending springs
-		for ( int bendingIndexLocal = 0; bendingIndexLocal < pCloth->GetBendSpringArray().size(); bendingIndexLocal++ )
+		for ( int bendingIndexLocal = 0; bendingIndexLocal < pCloth->getBendSpringArray().size(); bendingIndexLocal++ )
 		{
 			// spring index
-			btSoftbodyLinkCL& spring = pCloth->GetBendSpringArray()[bendingIndexLocal];
+			btSoftbodyLinkCL& spring = pCloth->getBendSpringArray()[bendingIndexLocal];
 			spring.SetIndex(getBendingSpringIndexGlobal(spring.GetIndex(), clothIndex));
 
 			// connected two vertex indexes
@@ -348,29 +384,30 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 	{
 		btSoftbodyCL* pCloth = m_tempClothArray[clothIndex];
 		
-		for ( int vertIter = 0; vertIter < pCloth->GetVertexArray().size(); vertIter++ )
+		for ( int vertIter = 0; vertIter < pCloth->getVertexArray().size(); vertIter++ )
 		{
-			pCloth->GetVertexArray()[vertIter].m_IndexCloth = clothIndex;
-			m_pMergedSoftBody->GetVertexArray().push_back(pCloth->GetVertexArray()[vertIter]);
+			pCloth->getVertexArray()[vertIter].m_IndexCloth = clothIndex;
+			m_pMergedSoftBody->getVertexArray().push_back(pCloth->getVertexArray()[vertIter]);
 		}
 
-		for ( int stretchIter = 0; stretchIter < pCloth->GetStrechSpringArray().size(); stretchIter++ )
+		for ( int stretchIter = 0; stretchIter < pCloth->getStrechSpringArray().size(); stretchIter++ )
 		{
-			pCloth->GetStrechSpringArray()[stretchIter].m_IndexCloth = clothIndex;
-			m_pMergedSoftBody->GetStrechSpringArray().push_back(pCloth->GetStrechSpringArray()[stretchIter]);
+			pCloth->getStrechSpringArray()[stretchIter].m_IndexCloth = clothIndex;
+			m_pMergedSoftBody->getStrechSpringArray().push_back(pCloth->getStrechSpringArray()[stretchIter]);
 		}
 
-		for ( int bendingIter = 0; bendingIter < pCloth->GetBendSpringArray().size(); bendingIter++ )
+		for ( int bendingIter = 0; bendingIter < pCloth->getBendSpringArray().size(); bendingIter++ )
 		{
-			pCloth->GetBendSpringArray()[bendingIter].m_IndexCloth = clothIndex;
-			m_pMergedSoftBody->GetBendSpringArray().push_back(pCloth->GetBendSpringArray()[bendingIter]);
+			pCloth->getBendSpringArray()[bendingIter].m_IndexCloth = clothIndex;
+			m_pMergedSoftBody->getBendSpringArray().push_back(pCloth->getBendSpringArray()[bendingIter]);
 		}
 	}
 
-	assert(m_numVertices == m_pMergedSoftBody->GetVertexArray().size());
-	assert(m_numStretchSprings == m_pMergedSoftBody->GetStrechSpringArray().size());
-	assert(m_numBendingSprings == m_pMergedSoftBody->GetBendSpringArray().size());
+	btAssert(m_numVertices == m_pMergedSoftBody->getVertexArray().size());
+	btAssert(m_numStretchSprings == m_pMergedSoftBody->getStrechSpringArray().size());
+	btAssert(m_numBendingSprings == m_pMergedSoftBody->getBendSpringArray().size());
 
+	// clear temporary softbodyq objects. 
 	for ( int i = 0; i < m_tempClothArray.size(); i++ )
 	{
 		delete m_tempClothArray[i];
@@ -381,13 +418,13 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 }
 
 // Must be called after mergeSoftBodies().
-void btSoftBodySimulationSolverOpenCL::GenerateBatches(bool bBatchEachSoftBodyFirst/*= false*/)
+void btSoftBodySimulationSolverOpenCL::generateBatches(bool bBatchEachSoftBodyFirst/*= false*/)
 {
 
-	m_pMergedSoftBody->GenerateBatches();
+	m_pMergedSoftBody->generateBatches();
 
-	m_BatchStretchSpringIndexGlobalArray = m_pMergedSoftBody->GetBatchStretchSpringIndexArray();
-	m_BatchBendSpringIndexGlobalArray = m_pMergedSoftBody->GetBatchBendSpringIndexArray();
+	m_BatchStretchSpringIndexGlobalArray = m_pMergedSoftBody->getBatchStretchSpringIndexArray();
+	m_BatchBendSpringIndexGlobalArray = m_pMergedSoftBody->getBatchBendSpringIndexArray();
 
 	//if ( bBatchEachSoftBodyFirst )
 	//{
@@ -432,7 +469,7 @@ void btSoftBodySimulationSolverOpenCL::GenerateBatches(bool bBatchEachSoftBodyFi
 	//}
 }
 
-void btSoftBodySimulationSolverOpenCL::UpdateBuffers()
+void btSoftBodySimulationSolverOpenCL::updateBuffers()
 {
 	if ( m_numVertices == 0 )
 		return;
@@ -495,7 +532,7 @@ void btSoftBodySimulationSolverOpenCL::UpdateBuffers()
 	//----------------------------
 	for ( int i = 0; i < m_numBendingSprings; i++ )
 	{
-		const btSoftbodyLinkCL& springData = m_pMergedSoftBody->GetBendSpringArray()[i];
+		const btSoftbodyLinkCL& springData = m_pMergedSoftBody->getBendSpringArray()[i];
 
 		btSoftBodySpringCL springDataCL;
 
@@ -527,7 +564,7 @@ int btSoftBodySimulationSolverOpenCL::getBendingSpringIndexGlobal(int bendingSpr
 	return m_HBClothInfoCL[clothIndex].m_OffsetBendingSprings + bendingSpringIndexLocal;
 }
 
-bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
+bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 {
 	if ( m_numVertices == 0 )
 		return true;
@@ -719,7 +756,7 @@ bool btSoftBodySimulationSolverOpenCL::Integrate(float dt)
 	return true;
 }
 
-bool btSoftBodySimulationSolverOpenCL::AdvancePosition(float dt)
+bool btSoftBodySimulationSolverOpenCL::advancePosition(float dt)
 {	
 	if ( m_numVertices == 0 )
 		return true;
@@ -744,7 +781,7 @@ bool btSoftBodySimulationSolverOpenCL::AdvancePosition(float dt)
 	return true;
 }
 
-bool btSoftBodySimulationSolverOpenCL::ResolveCollision(float dt)
+bool btSoftBodySimulationSolverOpenCL::resolveCollision(float dt)
 {
 	if ( m_numVertices == 0 )
 		return true;
@@ -815,7 +852,7 @@ btScalar signedDistanceFromPointToPlane(const btVector3& point, const btScalar* 
 	}
 }
 
-bool btSoftBodySimulationSolverOpenCL::ResolveCollisionCPU(float dt)
+bool btSoftBodySimulationSolverOpenCL::resolveCollisionCPU(float dt)
 {
 	//ReadBackFromGPU();
 
@@ -909,7 +946,7 @@ bool btSoftBodySimulationSolverOpenCL::ResolveCollisionCPU(float dt)
 	return true;
 }
 
-bool btSoftBodySimulationSolverOpenCL::ReadBackFromGPU()
+bool btSoftBodySimulationSolverOpenCL::readBackFromGPU()
 {
 	if ( m_numVertices == 0 )
 		return true;
@@ -937,7 +974,7 @@ bool btSoftBodySimulationSolverOpenCL::ReadBackFromGPU()
 	{
 		btSoftbodyCL* pCloth = m_clothArray[i];
 
-		for ( int j = 0; j < pCloth->GetVertexArray().size(); j++ )
+		for ( int j = 0; j < pCloth->getVertexArray().size(); j++ )
 		{
 			const btSoftBodyVertexCL& vertexData = m_HBVertexCL[index];
 			index++;
@@ -949,7 +986,7 @@ bool btSoftBodySimulationSolverOpenCL::ReadBackFromGPU()
 			pCloth->m_AABBVertexArray[j].Max() = btVector3(vertexData.m_AABBMax.x, vertexData.m_AABBMax.y, vertexData.m_AABBMax.z);
 		}
 
-		pCloth->UpdateSoftBodyCPU();
+		pCloth->updateSoftBodyCPU();
 
 		pCloth->m_Aabb.Min() = TobtVector3(m_HBClothInfoCL[i].m_AABBMin);
 		pCloth->m_Aabb.Max() = TobtVector3(m_HBClothInfoCL[i].m_AABBMax);
@@ -971,16 +1008,16 @@ bool btSoftBodySimulationSolverOpenCL::ReadBackFromGPU()
 //	return btSoftbodyCL::ResolveCollision(convexObject, dt);
 //}
 
-void btSoftBodySimulationSolverOpenCL::InitializeBoundingVolumes()
+void btSoftBodySimulationSolverOpenCL::initializeBoundingVolumes()
 {
 	for ( int i = 0; i < m_numClothes; i++ )
 	{
 		btSoftbodyCL* pCloth = m_clothArray[i];
-		pCloth->InitializeBoundingVolumes();
+		pCloth->initializeBoundingVolumes();
 	}
 }
 
-void btSoftBodySimulationSolverOpenCL::UpdateBoundingVolumes(float dt)
+void btSoftBodySimulationSolverOpenCL::updateBoundingVolumes(float dt)
 {	
 	if ( m_numVertices == 0 )
 		return;
@@ -1023,7 +1060,7 @@ void btSoftBodySimulationSolverOpenCL::UpdateBoundingVolumes(float dt)
 	}
 }
 
-void btSoftBodySimulationSolverOpenCL::ReleaseKernels()
+void btSoftBodySimulationSolverOpenCL::releaseKernels()
 {
 	if ( !m_bBuildCLKernels )
 		return;
@@ -1038,51 +1075,6 @@ void btSoftBodySimulationSolverOpenCL::ReleaseKernels()
 	RELEASE_CL_KERNEL(m_UpdateVertexBoundingVolumeKernel);
 	RELEASE_CL_KERNEL(m_UpdateClothBoundingVolumeKernel);
 	RELEASE_CL_KERNEL(m_ResolveCollisionKernel);
-}
-
-bool btSoftBodySimulationSolverOpenCL::BuildCLKernels()
-{
-	if ( m_bBuildCLKernels )
-		return true;
-
-	ReleaseKernels();
-
-	/*m_clFunctions.clearKernelCompilationFailures();
-
-	m_ClearForcesKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ClearForcesKernel");
-	m_ComputeNextVertexPositionsKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ComputeNextVertexPositionsKernel");
-	m_ApplyGravityKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ApplyGravityKernel");
-	m_ApplyForcesKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ApplyForcesKernel");
-	m_EnforceEdgeConstraintsKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "EnforceEdgeConstraintsKernel");
-	m_UpdateVelocitiesKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "UpdateVelocitiesKernel");
-	m_AdvancePositionKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "AdvancePositionKernel");
-	m_UpdateVertexBoundingVolumeKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "UpdateVertexBoundingVolumeKernel");
-	m_UpdateClothBoundingVolumeKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "UpdateClothBoundingVolumeKernel");
-	m_ResolveCollisionKernel = m_clFunctions.compileCLKernelFromString(SoftBodyCLString, "ResolveCollisionKernel");
-
-	if( m_clFunctions.getKernelCompilationFailures()==0 )
-		m_bBuildCLKernels = true;*/
-
-	const char* softbodyKernelsSrc = SoftBodyKernals;
-	cl_int errNum=0;
-
-	cl_program clProg = b3OpenCLUtils::compileCLProgramFromString(m_context,m_device,softbodyKernelsSrc,&errNum,"",B3_SOFTBODY_KERNELS_PATH);
-	b3Assert(errNum==CL_SUCCESS);
-
-	m_ClearForcesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ClearForcesKernel",&errNum,clProg );
-	m_ComputeNextVertexPositionsKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ComputeNextVertexPositionsKernel",&errNum,clProg );
-	m_ApplyGravityKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ApplyGravityKernel",&errNum,clProg );
-	m_ApplyForcesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ApplyForcesKernel",&errNum,clProg );
-	m_EnforceEdgeConstraintsKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "EnforceEdgeConstraintsKernel",&errNum,clProg );
-	m_UpdateVelocitiesKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateVelocitiesKernel",&errNum,clProg );
-	m_AdvancePositionKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "AdvancePositionKernel",&errNum,clProg );
-	m_UpdateVertexBoundingVolumeKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateVertexBoundingVolumeKernel",&errNum,clProg );
-	m_UpdateClothBoundingVolumeKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "UpdateClothBoundingVolumeKernel",&errNum,clProg );
-	m_ResolveCollisionKernel = b3OpenCLUtils::compileCLKernelFromString(m_context, m_device,softbodyKernelsSrc, "ResolveCollisionKernel",&errNum,clProg );
-
-	m_bBuildCLKernels = true;
-
-	return m_bBuildCLKernels;
 }
 
 

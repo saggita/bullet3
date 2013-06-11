@@ -201,81 +201,79 @@ public:
 	bool m_bEqualVertexMass;
 	int m_NumIterForConstraintSolver;
 
-	virtual bool Load(const char* filename);
-	virtual void Initialize();
-	float GetKst() const { return m_Kst; };
-	float GetKb() const { return m_Kb; };
-	float GetFrictionCoef() const { return m_Mu; }
-	void SetKst(float Kst) { assert(0 <= Kst && Kst <= 1.0f); m_Kst = Kst; };
-	void SetKb(float Kb) { assert(0 <= Kb && Kb <= 1.0f); m_Kb = Kb; };
-	void SetFrictionCoef(float mu) { assert(mu >= 0 && mu <= 1.0f); m_Mu = mu; }
-	float Getdt() const { return m_dt; } 
-	void Setdt(float dt) { m_dt = dt; }
-	void SetGravity(const btVector3& gravity);
+	virtual bool load(const char* filename);
+	virtual void initialize();
+	float getKst() const { return m_Kst; };
+	float getKb() const { return m_Kb; };
+	float getFrictionCoef() const { return m_Mu; }
+	void setKst(float Kst) { assert(0 <= Kst && Kst <= 1.0f); m_Kst = Kst; };
+	void setKb(float Kb) { assert(0 <= Kb && Kb <= 1.0f); m_Kb = Kb; };
+	void setFrictionCoef(float mu) { assert(mu >= 0 && mu <= 1.0f); m_Mu = mu; }
+	float getdt() const { return m_dt; } 
+	void setdt(float dt) { m_dt = dt; }
+	void setGravity(const btVector3& gravity);
 	const btVector3& GetGravity() const;
-	bool GetShowBV() { return m_bShowBV; }
-	void SetShowBV(bool bShowBV) { m_bShowBV = bShowBV; }
-	void SetMassDensity(float massDensity);
-	void SetVertexMass(float vertexMass);
-	void SetTotalMass(float totalMass);
-	void SetNumIterForConstraintSolver(int numIter) { m_NumIterForConstraintSolver = numIter; }
-	const CAabb& GetAabb() const { return m_Aabb; }
-	void SetAabb(const CAabb& aabb) { m_Aabb = aabb; }
+	bool getShowBV() { return m_bShowBV; }
+	void setShowBV(bool bShowBV) { m_bShowBV = bShowBV; }
+	void setMassDensity(float massDensity);
+	void setVertexMass(float vertexMass);
+	void setTotalMass(float totalMass);
+	void setNumIterForConstraintSolver(int numIter) { m_NumIterForConstraintSolver = numIter; }
+	const CAabb& getAabb() const { return m_Aabb; }
+	void setAabb(const CAabb& aabb) { m_Aabb = aabb; }
 
-	float GetMargin() const { return m_Margin; }
-	void SetMargin(float margin) { m_Margin = margin; }
+	float getMargin() const { return m_Margin; }
+	void setMargin(float margin) { m_Margin = margin; }
 
-	btAlignedObjectArray<btSoftbodyNodeCL>& GetVertexArray() { return m_VertexArray; }
-	const btAlignedObjectArray<btSoftbodyNodeCL>& GetVertexArray() const { return m_VertexArray; }
+	btAlignedObjectArray<btSoftbodyNodeCL>& getVertexArray() { return m_VertexArray; }
+	const btAlignedObjectArray<btSoftbodyNodeCL>& getVertexArray() const { return m_VertexArray; }
 
-	btAlignedObjectArray<btSoftbodyLinkCL>& GetStrechSpringArray() { return m_StrechSpringArray; }
-	const btAlignedObjectArray<btSoftbodyLinkCL>& GetStrechSpringArray() const { return m_StrechSpringArray; }
+	btAlignedObjectArray<btSoftbodyLinkCL>& getStrechSpringArray() { return m_StrechSpringArray; }
+	const btAlignedObjectArray<btSoftbodyLinkCL>& getStrechSpringArray() const { return m_StrechSpringArray; }
 
-	btAlignedObjectArray<btSoftbodyLinkCL>& GetBendSpringArray() { return m_BendSpringArray; }
-	const btAlignedObjectArray<btSoftbodyLinkCL>& GetBendSpringArray() const { return m_BendSpringArray; }
+	btAlignedObjectArray<btSoftbodyLinkCL>& getBendSpringArray() { return m_BendSpringArray; }
+	const btAlignedObjectArray<btSoftbodyLinkCL>& getBendSpringArray() const { return m_BendSpringArray; }
 
-	btAlignedObjectArray<btSoftbodyTriangleCL>& GetTriangleArray() { return m_TriangleArray; }
-	const btAlignedObjectArray<btSoftbodyTriangleCL>& GetTriangleArray() const { return m_TriangleArray; }
+	btAlignedObjectArray<btSoftbodyTriangleCL>& getTriangleArray() { return m_TriangleArray; }
+	const btAlignedObjectArray<btSoftbodyTriangleCL>& getTriangleArray() const { return m_TriangleArray; }
 
-	const btAlignedObjectArray<int>&  GetBatchStretchSpringIndexArray() { return m_BatchStretchSpringIndexArray; }
-	const btAlignedObjectArray<int>&  GetBatchBendSpringIndexArray() { return  m_BatchBendSpringIndexArray; }
+	const btAlignedObjectArray<int>&  getBatchStretchSpringIndexArray() { return m_BatchStretchSpringIndexArray; }
+	const btAlignedObjectArray<int>&  getBatchBendSpringIndexArray() { return  m_BatchBendSpringIndexArray; }
 
-	bool IsDeformable() const { return m_bDeformable; }
-	void SetDeformable(bool bDeformable) { m_bDeformable = bDeformable; }
+	bool isDeformable() const { return m_bDeformable; }
+	void setDeformable(bool bDeformable) { m_bDeformable = bDeformable; }
 
-	void Clear();
+	btSoftBody* getSoftBodyCPU() { return m_pSoftBodyCPU; }
+	const btSoftBody* getSoftBodyCPU() const { return m_pSoftBodyCPU; }
+
+	void clear();
 	
-	void GenerateBatches();
-	int GetNumBatchStretchSpring() { return m_numBatchStretchSpring; }
-	int GetNumBatchBendingSpring() { return m_numBatchBendingSpring; }
+	void generateBatches();
+	int getNumBatchStretchSpring() { return m_numBatchStretchSpring; }
+	int getNumBatchBendingSpring() { return m_numBatchBendingSpring; }
 
-	virtual bool Integrate(float dt);
-	virtual bool AdvancePosition(float dt);
-	
-	virtual void Render(bool bBBox = false);
-	int RenderBatch(int i) const;
+	virtual bool integrate(float dt);
+	virtual bool advancePosition(float dt);
 
 	/*virtual bool ResolveCollision(CCollisionObject& convexObject, float dt);*/
 
-	virtual void InitializeBoundingVolumes();
-	virtual void UpdateBoundingVolumes(float dt);
-
-	virtual void TranslateW(float x, float y, float z);
-
-	void UpdateSoftBodyCPU();
+	virtual void initializeBoundingVolumes();
+	virtual void updateBoundingVolumes(float dt);
+	
+	void updateSoftBodyCPU();
 
 protected:
-	void FillSpringArray();
-	void ApplyGravity(float dt);
-	void ApplyForces(float dt);
-	void ClearForces();	
-	void ComputeNextVertexPositions(float dt);
-	float CalcConstraint(int indexEdge, int indexVertex, float dt, btVector3* pGradientOfConstraint = NULL);
-	void EnforceEdgeConstraints(float k, float dt);
-	void EnforceBendingConstraints(float k, float dt);
-	void EnforceEdgeConstraintsBatched(float k, float dt);
-	void EnforceBendingConstraintsBatched(float k, float dt);
-	void UpdateVelocities(float dt);
+	void fillSpringArray();
+	void applyGravity(float dt);
+	void applyForces(float dt); 
+	void clearForces();	
+	void computeNextVertexPositions(float dt); 
+	float clcConstraint(int indexEdge, int indexVertex, float dt, btVector3* pGradientOfConstraint = NULL);
+	void enforceEdgeConstraints(float k, float dt);
+	void enforceBendingConstraints(float k, float dt);
+	void enforceEdgeConstraintsBatched(float k, float dt);
+	void enforceBendingConstraintsBatched(float k, float dt);
+	void updateVelocities(float dt);
 	
 public:
 	btSoftbodyCL& operator=(const btSoftbodyCL& other);

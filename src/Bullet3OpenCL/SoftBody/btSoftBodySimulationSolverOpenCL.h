@@ -1,6 +1,5 @@
-#pragma once
-
-//#include "CLFunctions.h"
+#ifndef B3_SOFTBODY_SOLVER_CL_H
+#define B3_SOFTBODY_SOLVER_CL_H
 
 #include "../Initialize/b3OpenCLInclude.h"
 
@@ -8,7 +7,6 @@
 #include "LinearMath\btAlignedObjectArray.h"
 #include "..\NarrowphaseCollision\b3ConvexPolyhedronCL.h"
 
-//struct CLPhysicsDemo;
 class btSoftbodyCL;
 struct float4;
 struct float4s;
@@ -24,7 +22,6 @@ public:
 	virtual ~btSoftBodySimulationSolverOpenCL(void);
 
 	btSoftbodyCL* m_pMergedSoftBody;
-	//CLPhysicsDemo*		m_gpuPhysics;
 
 protected:
 	btAlignedObjectArray<btSoftbodyCL*> m_clothArray;
@@ -40,7 +37,7 @@ protected:
 	// for batches
 	btAlignedObjectArray<int> m_BatchStretchSpringIndexGlobalArray; // index is global
 	btAlignedObjectArray<int> m_BatchBendSpringIndexGlobalArray; // index is global
-	void GenerateBatches(bool bBatchEachSoftBodyFirst = false); 
+	void generateBatches(bool bBatchEachSoftBodyFirst = false); 
 	void mergeSoftBodies();
 
 	cl_context				m_context;
@@ -59,9 +56,9 @@ protected:
 	btSoftBodyLinkCL* m_HBLinkCL;
 	
 	bool m_bBuildCLKernels;
-	bool BuildCLKernels();
-	void ReleaseKernels();	
-	void UpdateBuffers();	
+	bool buildCLKernels();
+	void releaseKernels();	
+	void updateBuffers();	
 
 	// OpenCL kernels
 	cl_kernel m_ClearForcesKernel;
@@ -75,8 +72,6 @@ protected:
 	cl_kernel m_UpdateClothBoundingVolumeKernel;
 	cl_kernel m_ResolveCollisionKernel;
 
-	//CLFunctions m_clFunctions;
-		
 	int getVertexIndexGlobal(int vertexIndexLocal, int clothIndex);
 	int getStretchSpringIndexGlobal(int stretchSpringIndexLocal, int clothIndex);
 	int getBendingSpringIndexGlobal(int bendingSpringIndexLocal, int clothIndex);
@@ -84,16 +79,18 @@ protected:
 public:
 	void setGravity(const btVector3& gravity) { m_Gravity = gravity; }
 
-	void Initialize();
-	bool Integrate(float dt);
-	bool AdvancePosition(float dt);
-	bool ResolveCollision(float dt);
-	bool ResolveCollisionCPU(float dt);
-	void InitializeBoundingVolumes();
-	void UpdateBoundingVolumes(float dt);
-	bool ReadBackFromGPU();
+	void initialize();
+	bool integrate(float dt);
+	bool advancePosition(float dt);
+	bool resolveCollision(float dt);
+	bool resolveCollisionCPU(float dt);
+	void initializeBoundingVolumes();
+	void updateBoundingVolumes(float dt);
+	bool readBackFromGPU();
 		
 	btAlignedObjectArray<btSoftbodyCL*>& getSoftBodies() { return m_clothArray; }
 	const btAlignedObjectArray<btSoftbodyCL*>& getSoftBodies() const { return m_clothArray; }
 	void addSoftBody(btSoftbodyCL* pCloth);
 };
+
+#endif // B3_SOFTBODY_SOLVER_CL_H

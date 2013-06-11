@@ -31,18 +31,18 @@ btSoftbodyTriangleCL::~btSoftbodyTriangleCL()
 
 btVector3 btSoftbodyTriangleCL::GetPointByBaryCoord(const btSoftbodyCL* pCloth, float a, float b, float c) const
 {
-	const btSoftbodyNodeCL& v0 = pCloth->GetVertexArray()[m_IndexVrx[0]];
-	const btSoftbodyNodeCL& v1 = pCloth->GetVertexArray()[m_IndexVrx[1]];
-	const btSoftbodyNodeCL& v2 = pCloth->GetVertexArray()[m_IndexVrx[2]];
+	const btSoftbodyNodeCL& v0 = pCloth->getVertexArray()[m_IndexVrx[0]];
+	const btSoftbodyNodeCL& v1 = pCloth->getVertexArray()[m_IndexVrx[1]];
+	const btSoftbodyNodeCL& v2 = pCloth->getVertexArray()[m_IndexVrx[2]];
 
 	return btVector3(v0.m_Pos*a + v1.m_Pos*b + v2.m_Pos*c);
 }
 
 btVector3 btSoftbodyTriangleCL::GetVelocityByBaryCoord(const btSoftbodyCL* pCloth, float a, float b, float c) const
 {
-	const btSoftbodyNodeCL& v0 = pCloth->GetVertexArray()[m_IndexVrx[0]];
-	const btSoftbodyNodeCL& v1 = pCloth->GetVertexArray()[m_IndexVrx[1]];
-	const btSoftbodyNodeCL& v2 = pCloth->GetVertexArray()[m_IndexVrx[2]];
+	const btSoftbodyNodeCL& v0 = pCloth->getVertexArray()[m_IndexVrx[0]];
+	const btSoftbodyNodeCL& v1 = pCloth->getVertexArray()[m_IndexVrx[1]];
+	const btSoftbodyNodeCL& v2 = pCloth->getVertexArray()[m_IndexVrx[2]];
 
 	return btVector3(v0.m_Vel*a + v1.m_Vel*b + v2.m_Vel*c);
 }

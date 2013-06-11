@@ -183,45 +183,7 @@ void CAabb::Split(IBoundingVolume*& leftBV, IBoundingVolume*& rightBV) const
 
 void CAabb::Visualize(bool bCollided) const
 {
-	/*btVector3 min(m_Min);
-	btVector3 max(m_Max);
-
-	if ( bCollided )
-		glColor3f(1.0f, 1.0f, 1.0f);
-	else
-		glColor3f(0.5f, 0.5f, 0.5f);
-
-	glLineWidth(1.0);
-
-	glBegin(GL_LINE_STRIP);
-		glVertex3d(min[0], min[1], min[2]);
-		glVertex3d(max[0], min[1], min[2]);
-		glVertex3d(max[0], min[1], max[2]);
-		glVertex3d(min[0], min[1], max[2]);
-		glVertex3d(min[0], min[1], min[2]);
-	glEnd();
-
-	glBegin(GL_LINE_STRIP);
-		glVertex3d(min[0], max[1], min[2]);
-		glVertex3d(max[0], max[1], min[2]);
-		glVertex3d(max[0], max[1], max[2]);
-		glVertex3d(min[0], max[1], max[2]);
-		glVertex3d(min[0], max[1], min[2]);
-	glEnd();
-
-	glBegin(GL_LINES);
-		glVertex3d(min[0], min[1], min[2]);
-		glVertex3d(min[0], max[1], min[2]);
-
-		glVertex3d(max[0], min[1], min[2]);
-		glVertex3d(max[0], max[1], min[2]);
-
-		glVertex3d(max[0], min[1], max[2]);
-		glVertex3d(max[0], max[1], max[2]);
-
-		glVertex3d(min[0], min[1], max[2]);
-		glVertex3d(min[0], max[1], max[2]);
-	glEnd();*/
+	
 }
 
 IBoundingVolume& CAabb::operator=(const IBoundingVolume& other)

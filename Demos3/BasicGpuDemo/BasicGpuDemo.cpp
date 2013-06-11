@@ -58,8 +58,6 @@ subject to the following restrictions:
 
 static GLDebugDrawer gDebugDraw;
 
-btSoftBody* softbody = NULL;
-
 void BasicGpuDemo::clientMoveAndDisplay()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
@@ -74,11 +72,62 @@ void BasicGpuDemo::clientMoveAndDisplay()
 		//optional but useful: debug drawing
 		m_dynamicsWorld->debugDrawWorld();
 
-		if ( softbody )
+		// draw softbodies
+		const btSoftBodySimulationSolverOpenCL* softbodySolverCL = ((b3GpuDynamicsWorld*)m_dynamicsWorld)->getSoftBodySolverCL();
+
+		if ( softbodySolverCL )
 		{
-			int drawFlags = fDrawFlags::Links | fDrawFlags::Faces;
-			btSoftBodyHelpers::Draw(softbody, m_dynamicsWorld->getDebugDrawer(), drawFlags);
+			for ( int i = 0; i < softbodySolverCL->getSoftBodies().size(); i++ )
+			{
+				btSoftBody* softbodyCPU = softbodySolverCL->getSoftBodies()[i]->getSoftBodyCPU();
+
+				int drawFlags = fDrawFlags::Links | fDrawFlags::Faces;
+				btSoftBodyHelpers::Draw(softbodyCPU, m_dynamicsWorld->getDebugDrawer(), drawFlags);
+			
+				// draw AABB of softbody
+				
+
+				btVector3 minAABB(softbodySolverCL->getSoftBodies()[i]->getAabb().Min());
+				btVector3 maxAABB(softbodySolverCL->getSoftBodies()[i]->getAabb().Max());
+
+				glColor3f(1.0f, 1.0f, 1.0f);
+
+				glLineWidth(1.0);
+
+				glBegin(GL_LINE_STRIP);
+					glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
+					glVertex3d(maxAABB[0], minAABB[1], minAABB[2]);
+					glVertex3d(maxAABB[0], minAABB[1], maxAABB[2]);
+					glVertex3d(minAABB[0], minAABB[1], maxAABB[2]);
+					glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
+				glEnd();
+
+				glBegin(GL_LINE_STRIP);
+					glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
+					glVertex3d(maxAABB[0], maxAABB[1], minAABB[2]);
+					glVertex3d(maxAABB[0], maxAABB[1], maxAABB[2]);
+					glVertex3d(minAABB[0], maxAABB[1], maxAABB[2]);
+					glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
+				glEnd();
+
+				glBegin(GL_LINES);
+					glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
+					glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
+
+					glVertex3d(maxAABB[0], minAABB[1], minAABB[2]);
+					glVertex3d(maxAABB[0], maxAABB[1], minAABB[2]);
+
+					glVertex3d(maxAABB[0], minAABB[1], maxAABB[2]);
+					glVertex3d(maxAABB[0], maxAABB[1], maxAABB[2]);
+
+					glVertex3d(minAABB[0], minAABB[1], maxAABB[2]);
+					glVertex3d(minAABB[0], maxAABB[1], maxAABB[2]);
+				glEnd();
+
+
+			}
 		}
+
 	}
 		
 	renderme(); 
@@ -257,7 +306,7 @@ btSoftBody* createFromIndexedMesh(btSoftBodyWorldInfo* softbodyWorldInfo, btVect
 	return softBody;
 }
 
-btSoftBody* createFlag(btSoftBodyWorldInfo* softbodyWorldInfo, int width, int height)
+btSoftBody* createFlag(btSoftBodyWorldInfo* softbodyWorldInfo, int width, int height, float xTranslate = 0)
 {
 	// First create a triangle mesh to represent a flag
 
@@ -345,9 +394,7 @@ btSoftBody* createFlag(btSoftBodyWorldInfo* softbodyWorldInfo, int width, int he
 	// Construct the sequence flags applying a slightly different translation to each one to arrange them
 	// appropriately in the scene.
 
-	float zTranslate = 0;
-
-	btVector3 defaultTranslate(0.f, 20.f, zTranslate);
+	btVector3 defaultTranslate(xTranslate, 20.f, 0);
 
 	btTransform transform( defaultRotateAndScale, defaultTranslate );
 	transform.setOrigin(defaultTranslate);
@@ -539,45 +586,17 @@ void	BasicGpuDemo::initPhysics()
 	}
 
 	// softbody
-	
-	if ( 0 )
-	{
-		//btSoftbodyCL* pCloth = new btSoftbodyCL();
-		////assert(pCloth->Load("..\\..\\bin\\circle2723.obj"));
-		//assert(pCloth->Load("F:\\My Programming 4\\experiments\\bin\\circle14200.obj"));
-		//pCloth->SetVertexMass(1.0f);
-		//pCloth->TranslateW(0.0f, 15.0f, 0.0f);
-		//pCloth->SetGravity(btVector3(0, -9.8, 0));
-		//pCloth->SetKb(0.45f); 
-		//pCloth->SetKst(0.995f); 
-		//pCloth->SetFrictionCoef(0.5f);
-		//pCloth->SetNumIterForConstraintSolver(7);
-		//pCloth->SetMargin(0.1f);
-		//pCloth->GetVertexArray()[0].m_InvMass = 0;
-		//pCloth->GetVertexArray()[0].m_Vel = btVector3(3.0f, 0, 0);
-		//pCloth->Initialize();
+	int numOfFlags = 10;
+	float xTranslateFlags = 15;
 
-		//((b3GpuDynamicsWorld*)m_dynamicsWorld)->addSoftBodyCl(pCloth);		
-	}
-
+	for ( int i = 0; i < numOfFlags; i++ )
 	{
 		btSoftBodyWorldInfo softbodyInfo;
-		softbody = createFlag(&softbodyInfo, 30, 30);
+		btSoftBody* softbody = createFlag(&softbodyInfo, 10, 10, xTranslateFlags * i);
 
-		btSoftbodyCL* pCloth = new btSoftbodyCL(softbody);
+		
 
-		pCloth->SetGravity(btVector3(0, -9.8, 0));
-		pCloth->SetKb(0.45f); 
-		pCloth->SetKst(0.995f); 
-		pCloth->SetFrictionCoef(0.5f);
-		pCloth->SetNumIterForConstraintSolver(7);
-		pCloth->SetMargin(0.1f);
-		//pCloth->GetVertexArray()[0].m_InvMass = 0;
-		//pCloth->GetVertexArray()[0].m_Vel = btVector3(3.0f, 0, 0);
-
-		pCloth->Initialize();
-
-		((b3GpuDynamicsWorld*)m_dynamicsWorld)->addSoftBodyCl(pCloth);		
+		((b3GpuDynamicsWorld*)m_dynamicsWorld)->addSoftBody(softbody);		
 	}
 
 
