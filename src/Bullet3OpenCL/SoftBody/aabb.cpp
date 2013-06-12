@@ -1,21 +1,4 @@
-#ifdef WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  define NOMINMAX
-#  include <windows.h>
-#  undef WIN32_LEAN_AND_MEAN
-#  undef NOMINMAX
-#endif
-
-#define NOMINMAX
 #include "Aabb.h"
-#include <algorithm>
-#include <limits>
-
-#include "LinearMath/btVector3.h"
-
-#include <assert.h>
-
-using namespace std;
 
 CAabb::CAabb(void) 
 {
@@ -32,7 +15,7 @@ CAabb::~CAabb(void)
 {
 }
 
-void CAabb::Set(const btVector3& min, const btVector3& max)
+void CAabb::Set(const b3Vector3& min, const b3Vector3& max)
 {
 	m_Min = min;
 	m_Max = max;
@@ -74,7 +57,7 @@ bool CAabb::Collide(const IBoundingVolume& other, float tolerance /*= 0*/) const
 	return true;
 }
 
-bool CAabb::Inside(const btVector3& point) const
+bool CAabb::Inside(const b3Vector3& point) const
 {
 	if ( point[0] < m_Min[0] || m_Max[0] < point[0] )
 		return false;
@@ -90,17 +73,17 @@ bool CAabb::Inside(const btVector3& point) const
 
 void CAabb::Empty()
 {
-	float max = numeric_limits<float>::max();
-	float min = numeric_limits<float>::min();
+	float max = 1e30;
+	float min = -1e30;
 
-	m_Min = btVector3(max, max, max);
-	m_Max = btVector3(min, min, min);
+	m_Min = b3Vector3(max, max, max);
+	m_Max = b3Vector3(min, min, min);
 }
 
 bool CAabb::IsEmpty() const
 {
-	float max = numeric_limits<float>::max();
-	float min = numeric_limits<float>::min();
+	float max = 1e30;
+	float min = -1e30;
 
 	if ( m_Min[0] == max && 
 		 m_Min[1] == max && 
@@ -128,7 +111,7 @@ float CAabb::Length() const
 	return m_Max[2] - m_Min[2];
 }
 
-btVector3 CAabb::Center() const
+b3Vector3 CAabb::Center() const
 {
 	return (m_Min + m_Max) * 0.5;
 }
@@ -160,7 +143,7 @@ void CAabb::Split(IBoundingVolume*& leftBV, IBoundingVolume*& rightBV) const
 	CAabb* lBox = (CAabb*)leftBV;
 	CAabb* rBox = (CAabb*)rightBV;
 	
-	btVector3 c = Center();
+	b3Vector3 c = Center();
 
 	int longSide = LongestSide();
 
@@ -202,7 +185,7 @@ CAabb& CAabb::operator=(const CAabb& other)
 	return (*this);
 }
 
-IBoundingVolume& CAabb::operator+=(const btVector3& vec)
+IBoundingVolume& CAabb::operator+=(const b3Vector3& vec)
 {
 	if ( IsEmpty() )
 	{
@@ -218,8 +201,8 @@ IBoundingVolume& CAabb::operator+=(const btVector3& vec)
 	{
 		for ( int i = 0; i < 3; i++ )
 		{
-			m_Min[i] = std::min(m_Min[i], vec[i]);
-			m_Max[i] = std::max(m_Max[i], vec[i]);
+			m_Min[i] = b3Min<float>(m_Min[i], vec[i]);
+			m_Max[i] = b3Max<float>(m_Max[i], vec[i]);
 		}
 	}
 
@@ -238,8 +221,8 @@ IBoundingVolume& CAabb::operator+=(const IBoundingVolume& other)
 	{
 		for ( int i = 0; i < 3; i++ )
 		{
-			m_Min[i] = std::min(m_Min[i], bv.m_Min[i]);
-			m_Max[i] = std::max(m_Max[i], bv.m_Max[i]);
+			m_Min[i] = b3Min<float>(m_Min[i], bv.m_Min[i]);
+			m_Max[i] = b3Max<float>(m_Max[i], bv.m_Max[i]);
 		}
 	}
 

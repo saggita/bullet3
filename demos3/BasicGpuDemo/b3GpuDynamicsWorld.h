@@ -25,6 +25,7 @@ class b3GpuDynamicsWorld : public btDynamicsWorld
 	class b3GpuSapBroadphase* m_bp;
 
 	class btSoftBodySimulationSolverOpenCL* m_softbodySolver;
+	btAlignedObjectArray<btSoftBody*> m_softbodies;
 	
 	btVector3			m_gravity;
 	bool	m_cpuGpuSync;
@@ -116,6 +117,9 @@ public:
 	void	synchronizeSingleMotionState(btRigidBody* body);
 
 	const btSoftBodySimulationSolverOpenCL* getSoftBodySolverCL() const { return m_softbodySolver; }
+
+	btAlignedObjectArray<btSoftBody*>& getSoftBodies() { return m_softbodies; }
+	const btAlignedObjectArray<btSoftBody*>& getSoftBodies() const { return m_softbodies; }
 };
 
 #endif //B3_GPU_DYNAMICS_WORLD_H

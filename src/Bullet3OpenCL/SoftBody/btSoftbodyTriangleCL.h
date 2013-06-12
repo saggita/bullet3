@@ -1,9 +1,9 @@
-#pragma once
+#ifndef B3_SOFTBODY_TRIANGLE_CL_H
+#define B3_SOFTBODY_TRIANGLE_CL_H
 
-#include <assert.h>
+#include "Bullet3Common/b3Vector3.h"
 
 class btSoftbodyCL;
-class btVector3;
 
 class btSoftbodyTriangleCL
 {
@@ -26,20 +26,20 @@ public:
 public:
 	int GetVertexIndex(int i) const 
 	{
-		assert( 0 <= i && i < 3 );
+		b3Assert( 0 <= i && i < 3 );
 
 		return m_IndexVrx[i];
 	}
 
 	void SetVertexIndex(int i, int vertexIndex)
 	{
-		assert( 0 <= i && i < 3 );
+		b3Assert( 0 <= i && i < 3 );
 		 m_IndexVrx[i] = vertexIndex;
 	}
 
 	int GetEdgeIndex(int i) const 
 	{
-		assert( 0 <= i && i < 3 );
+		b3Assert( 0 <= i && i < 3 );
 
 		return m_IndexEdge[i];
 	}
@@ -47,8 +47,10 @@ public:
 	int GetIndex() const { return m_Index; }
 	void SetIndex(int index) { m_Index = index; }
 	int GetNormalVectIndex() const { return m_IndexNormalVec; }
-	btVector3 GetPointByBaryCoord(const btSoftbodyCL* pCloth, float a, float b, float c) const;
-	btVector3 GetVelocityByBaryCoord(const btSoftbodyCL* pCloth, float a, float b, float c) const;
+	b3Vector3 GetPointByBaryCoord(const btSoftbodyCL* pCloth, float a, float b, float c) const;
+	b3Vector3 GetVelocityByBaryCoord(const btSoftbodyCL* pCloth, float a, float b, float c) const;
 	
 	btSoftbodyTriangleCL& operator=(const btSoftbodyTriangleCL& other);
 };
+
+#endif // B3_SOFTBODY_TRIANGLE_CL_H

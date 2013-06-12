@@ -15,9 +15,10 @@
 #include "Bullet3OpenCL/BroadphaseCollision/b3GpuSapBroadphase.h"
 #include "Bullet3OpenCL/RigidBody/b3GpuNarrowPhase.h"
 #include "Bullet3OpenCL/RigidBody/b3GpuRigidBodyPipeline.h"
+#include "Bullet3Common/b3Vector3.h"
 
-
-
+#include "BulletSoftBody/btSoftBody.h"
+#include "Bullet3Common/b3Vector3.h"
 
 #ifdef _WIN32
 	#include <windows.h>
@@ -80,12 +81,23 @@ int		b3GpuDynamicsWorld::stepSimulation( btScalar timeStep, int maxSubSteps, btS
 	m_rigidBodyPipeline->stepSimulation(fixedTimeStep);
 
 	// simulate softbodies
+	btAssert(m_softbodies.size() == m_softbodySolver->getSoftBodies().size());
+
 	m_softbodySolver->integrate(fixedTimeStep);
 	m_softbodySolver->advancePosition(fixedTimeStep);
 	m_softbodySolver->updateBoundingVolumes(fixedTimeStep);
 	m_softbodySolver->resolveCollision(fixedTimeStep);
 	//m_softbodySolver->ResolveCollisionCPU(fixedTimeStep);
 	m_softbodySolver->readBackFromGPU();
+
+	for ( int i = 0; i < m_softbodies.size(); i++ )
+	{
+		for ( int j = 0; j < m_softbodies[i]->m_nodes.size(); j++ )
+		 {
+			 const b3Vector3& pos = m_softbodySolver->getSoftBodies()[i]->getVertexArray()[j].m_Pos;
+			 m_softbodies[i]->m_nodes[j].m_x = btVector3(pos.x, pos.y, pos.z);
+		 }
+	}
 
 
 	{
@@ -329,22 +341,51 @@ void	b3GpuDynamicsWorld::addRigidBody(btRigidBody* body)
 
 void	b3GpuDynamicsWorld::addSoftBody(btSoftBody* body)
 {
-	btSoftbodyCL* softbodyCL = new btSoftbodyCL(body);
-	softbodyCL->setGravity(getGravity());
+	btSoftbodyCL* softbodyCL = new btSoftbodyCL();
+	softbodyCL->setGravity(b3Vector3(getGravity().x(), getGravity().y(), getGravity().z()));
 	softbodyCL->setKb(0.45f); 
 	softbodyCL->setKst(0.995f); 
 	softbodyCL->setFrictionCoef(0.5f);
 	softbodyCL->setNumIterForConstraintSolver(10);
 	softbodyCL->setMargin(0.1f);
-	softbodyCL->initialize();
+
+	// nodes
+	 int index = 0;
+	 for ( int i = 0; i < body->m_nodes.size(); i++ )
+	 {
+		btSoftbodyNodeCL nodeCl;
+		nodeCl.m_Index = index++;
+		nodeCl.m_Pos = b3Vector3(body->m_nodes[i].m_x.x(), body->m_nodes[i].m_x.y(), body->m_nodes[i].m_x.z());
+		nodeCl.m_PosNext = nodeCl.m_Pos;
+		nodeCl.m_Vel = b3Vector3(body->m_nodes[i].m_v.x(), body->m_nodes[i].m_v.y(), body->m_nodes[i].m_v.z());
+		nodeCl.m_InvMass = body->m_nodes[i].m_im;
+		body->m_nodes[i].m_tag = (void*)nodeCl.m_Index;
+		softbodyCL->getVertexArray().push_back(nodeCl);
+	 }
+	
+	 // faces
+	 for ( int i = 0; i < body->m_faces.size(); i++ )
+	 {
+		 btSoftbodyTriangleCL faceCl;
+
+		 faceCl.SetVertexIndex(0, (int)body->m_faces[i].m_n[0]->m_tag);
+		 faceCl.SetVertexIndex(1, (int)body->m_faces[i].m_n[1]->m_tag);
+		 faceCl.SetVertexIndex(2, (int)body->m_faces[i].m_n[2]->m_tag);
+		 faceCl.SetIndex(softbodyCL->getTriangleArray().size());
+		 softbodyCL->getTriangleArray().push_back(faceCl);
+	}
+	
+	 softbodyCL->initialize();
 
 	m_softbodySolver->addSoftBody(softbodyCL);
+	m_softbodies.push_back(body);
 }
 
 	
 void	b3GpuDynamicsWorld::removeSoftBody(btSoftBody* body)
 {
-
+	// Not implemented yet!
+	btAssert(0);
 }
 
 

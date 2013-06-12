@@ -1,17 +1,12 @@
-#pragma once
-
-
-#include <assert.h>
-
-#include <iostream>
-#include <fstream>
+#ifndef B3_SOFTBODY_CL_H
+#define B3_SOFTBODY_CL_H
 
 #include "aabb.h"
 
-#include "LinearMath/btAlignedObjectArray.h"
-#include "LinearMath/btVector3.h"
+#include "Bullet3Common/b3Vector3.h"
+#include "Bullet3Common/b3AlignedObjectArray.h"
+#include "btSoftbodyTriangleCL.h"
 
-class btVector3;
 class btSoftbodyTriangleCL;
 class btSoftBody;
 
@@ -68,7 +63,7 @@ public:
 
 	int GetVertexIndex(int i) const 
 	{
-		assert( 0 <= i && i <= 1 );
+		b3Assert( 0 <= i && i <= 1 );
 
 		return m_IndexVrx[i];
 	}
@@ -81,13 +76,13 @@ public:
 
 	int GetTriangleIndex(int i) const 
 	{ 
-		assert( 0 <= i && i <= 1 );
+		b3Assert( 0 <= i && i <= 1 );
 		return m_IndexTriangle[i]; 
 	}
 
 	int GetTheOtherVertexIndex(int indexVert)
 	{
-		assert(indexVert == m_IndexVrx[0] || indexVert == m_IndexVrx[1]);
+		b3Assert(indexVert == m_IndexVrx[0] || indexVert == m_IndexVrx[1]);
 
 		if ( indexVert == m_IndexVrx[0] )
 			return m_IndexVrx[1];
@@ -135,18 +130,18 @@ public:
 
 	int m_Index;
 	int m_IndexCloth;
-	btVector3 m_Pos;
-	btVector3 m_PosNext;
-	btVector3 m_Vel;
+	b3Vector3 m_Pos;
+	b3Vector3 m_PosNext;
+	b3Vector3 m_Vel;
 	float m_InvMass; // Inverse mass. To pin the vertex, set zero to make the mass infinite. 
-	btVector3 m_Accel;
+	b3Vector3 m_Accel;
 	int m_PinIndex;
 		
 	// array of indexes of stretch springs connected to this vertex 
-	btAlignedObjectArray<int> m_StrechSpringIndexes; 
+	b3AlignedObjectArray<int> m_StrechSpringIndexes; 
 
 	// array of indexes of bend springs connected to this vertex 
-	btAlignedObjectArray<int> m_BendSpringIndexes; 
+	b3AlignedObjectArray<int> m_BendSpringIndexes; 
 
 public:
 	int GetIndex() const { return m_Index; }
@@ -158,7 +153,6 @@ class btSoftbodyCL
 public:
 	btSoftbodyCL();
 	btSoftbodyCL(btSoftBody* softbody);
-	btSoftbodyCL(const btSoftbodyCL& other);
 	virtual ~btSoftbodyCL(void);
 
 public:
@@ -168,31 +162,25 @@ public:
 
 	float m_Kd;
 	float m_Mu; // friction
-	btVector3 m_Gravity;
-	//CBVHTree* m_pBVHTree;
+	b3Vector3 m_Gravity;
 	bool m_bDeformable;
 	
 	CAabb m_Aabb;
 
-	btAlignedObjectArray<btSoftbodyNodeCL> m_VertexArray;
-	btAlignedObjectArray<btSoftbodyLinkCL> m_StrechSpringArray;
-	btAlignedObjectArray<btSoftbodyLinkCL> m_BendSpringArray;
-	btAlignedObjectArray<btVector3> m_NormalVecArray;
-	btAlignedObjectArray<btSoftbodyTriangleCL> m_TriangleArray;
+	b3AlignedObjectArray<btSoftbodyNodeCL> m_VertexArray;
+	b3AlignedObjectArray<btSoftbodyLinkCL> m_StrechSpringArray;
+	b3AlignedObjectArray<btSoftbodyLinkCL> m_BendSpringArray;
+	b3AlignedObjectArray<b3Vector3> m_NormalVecArray;
+	b3AlignedObjectArray<btSoftbodyTriangleCL> m_TriangleArray;
 
-	btAlignedObjectArray<CAabb> m_AABBVertexArray;
+	b3AlignedObjectArray<CAabb> m_AABBVertexArray;
 
-	btAlignedObjectArray<int> m_BatchStretchSpringIndexArray;
-	btAlignedObjectArray<int> m_BatchBendSpringIndexArray;
+	b3AlignedObjectArray<int> m_BatchStretchSpringIndexArray;
+	b3AlignedObjectArray<int> m_BatchBendSpringIndexArray;
 	int m_numBatchStretchSpring;
 	int m_numBatchBendingSpring;
 	
 protected:	
-	btSoftBody* m_pSoftBodyCPU;
-
-	// for debug
-	bool m_bShowBV; // toggle showing bounding volume
-	
 	// margin for collision detection
 	float m_Margin;	
 
@@ -201,20 +189,17 @@ public:
 	bool m_bEqualVertexMass;
 	int m_NumIterForConstraintSolver;
 
-	virtual bool load(const char* filename);
 	virtual void initialize();
 	float getKst() const { return m_Kst; };
 	float getKb() const { return m_Kb; };
 	float getFrictionCoef() const { return m_Mu; }
-	void setKst(float Kst) { assert(0 <= Kst && Kst <= 1.0f); m_Kst = Kst; };
-	void setKb(float Kb) { assert(0 <= Kb && Kb <= 1.0f); m_Kb = Kb; };
-	void setFrictionCoef(float mu) { assert(mu >= 0 && mu <= 1.0f); m_Mu = mu; }
+	void setKst(float Kst) { b3Assert(0 <= Kst && Kst <= 1.0f); m_Kst = Kst; };
+	void setKb(float Kb) { b3Assert(0 <= Kb && Kb <= 1.0f); m_Kb = Kb; };
+	void setFrictionCoef(float mu) { b3Assert(mu >= 0 && mu <= 1.0f); m_Mu = mu; }
 	float getdt() const { return m_dt; } 
 	void setdt(float dt) { m_dt = dt; }
-	void setGravity(const btVector3& gravity);
-	const btVector3& GetGravity() const;
-	bool getShowBV() { return m_bShowBV; }
-	void setShowBV(bool bShowBV) { m_bShowBV = bShowBV; }
+	void setGravity(const b3Vector3& gravity);
+	const b3Vector3& GetGravity() const;
 	void setMassDensity(float massDensity);
 	void setVertexMass(float vertexMass);
 	void setTotalMass(float totalMass);
@@ -225,26 +210,23 @@ public:
 	float getMargin() const { return m_Margin; }
 	void setMargin(float margin) { m_Margin = margin; }
 
-	btAlignedObjectArray<btSoftbodyNodeCL>& getVertexArray() { return m_VertexArray; }
-	const btAlignedObjectArray<btSoftbodyNodeCL>& getVertexArray() const { return m_VertexArray; }
+	b3AlignedObjectArray<btSoftbodyNodeCL>& getVertexArray() { return m_VertexArray; }
+	const b3AlignedObjectArray<btSoftbodyNodeCL>& getVertexArray() const { return m_VertexArray; }
 
-	btAlignedObjectArray<btSoftbodyLinkCL>& getStrechSpringArray() { return m_StrechSpringArray; }
-	const btAlignedObjectArray<btSoftbodyLinkCL>& getStrechSpringArray() const { return m_StrechSpringArray; }
+	b3AlignedObjectArray<btSoftbodyLinkCL>& getStrechSpringArray() { return m_StrechSpringArray; }
+	const b3AlignedObjectArray<btSoftbodyLinkCL>& getStrechSpringArray() const { return m_StrechSpringArray; }
 
-	btAlignedObjectArray<btSoftbodyLinkCL>& getBendSpringArray() { return m_BendSpringArray; }
-	const btAlignedObjectArray<btSoftbodyLinkCL>& getBendSpringArray() const { return m_BendSpringArray; }
+	b3AlignedObjectArray<btSoftbodyLinkCL>& getBendSpringArray() { return m_BendSpringArray; }
+	const b3AlignedObjectArray<btSoftbodyLinkCL>& getBendSpringArray() const { return m_BendSpringArray; }
 
-	btAlignedObjectArray<btSoftbodyTriangleCL>& getTriangleArray() { return m_TriangleArray; }
-	const btAlignedObjectArray<btSoftbodyTriangleCL>& getTriangleArray() const { return m_TriangleArray; }
+	b3AlignedObjectArray<btSoftbodyTriangleCL>& getTriangleArray() { return m_TriangleArray; }
+	const b3AlignedObjectArray<btSoftbodyTriangleCL>& getTriangleArray() const { return m_TriangleArray; }
 
-	const btAlignedObjectArray<int>&  getBatchStretchSpringIndexArray() { return m_BatchStretchSpringIndexArray; }
-	const btAlignedObjectArray<int>&  getBatchBendSpringIndexArray() { return  m_BatchBendSpringIndexArray; }
+	const b3AlignedObjectArray<int>&  getBatchStretchSpringIndexArray() { return m_BatchStretchSpringIndexArray; }
+	const b3AlignedObjectArray<int>&  getBatchBendSpringIndexArray() { return  m_BatchBendSpringIndexArray; }
 
 	bool isDeformable() const { return m_bDeformable; }
 	void setDeformable(bool bDeformable) { m_bDeformable = bDeformable; }
-
-	btSoftBody* getSoftBodyCPU() { return m_pSoftBodyCPU; }
-	const btSoftBody* getSoftBodyCPU() const { return m_pSoftBodyCPU; }
 
 	void clear();
 	
@@ -259,8 +241,6 @@ public:
 
 	virtual void initializeBoundingVolumes();
 	virtual void updateBoundingVolumes(float dt);
-	
-	void updateSoftBodyCPU();
 
 protected:
 	void fillSpringArray();
@@ -268,15 +248,13 @@ protected:
 	void applyForces(float dt); 
 	void clearForces();	
 	void computeNextVertexPositions(float dt); 
-	float clcConstraint(int indexEdge, int indexVertex, float dt, btVector3* pGradientOfConstraint = NULL);
+	float clcConstraint(int indexEdge, int indexVertex, float dt, b3Vector3* pGradientOfConstraint = NULL);
 	void enforceEdgeConstraints(float k, float dt);
 	void enforceBendingConstraints(float k, float dt);
 	void enforceEdgeConstraintsBatched(float k, float dt);
 	void enforceBendingConstraintsBatched(float k, float dt);
 	void updateVelocities(float dt);
-	
-public:
-	btSoftbodyCL& operator=(const btSoftbodyCL& other);
 };
 
+#endif // B3_SOFTBODY_CL_H
 

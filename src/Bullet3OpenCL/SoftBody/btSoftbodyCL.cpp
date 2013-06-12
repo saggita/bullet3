@@ -1,14 +1,6 @@
-#include <omp.h>
-
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-
 #include "btSoftbodyCL.h"
-#include "StringTokenizer.h"
 #include "btSoftbodyTriangleCL.h"
-#include "../BulletSoftBody/btSoftBody.h"
+//#include "../BulletSoftBody/btSoftBody.h"
 
 inline float clamp(float val, float low, float high)
 {
@@ -22,7 +14,7 @@ inline float clamp(float val, float low, float high)
 
 using namespace std;
 
-btSoftbodyCL::btSoftbodyCL() : m_pSoftBodyCPU(NULL), m_bDeformable(true), m_Gravity(0.0f, -9.8f, 0.0f), m_dt(0.0f), m_bShowBV(false), m_Margin(0.01)
+btSoftbodyCL::btSoftbodyCL() : m_bDeformable(true), m_Gravity(0.0f, -9.8f, 0.0f), m_dt(0.0f), m_Margin(0.01)
 {
 	m_Kst = 0.95f;
 	m_Kb = 0.4f;
@@ -34,68 +26,6 @@ btSoftbodyCL::btSoftbodyCL() : m_pSoftBodyCPU(NULL), m_bDeformable(true), m_Grav
 
 	 m_numBatchStretchSpring = 0;
 	 m_numBatchBendingSpring = 0;
-}
-
-btSoftbodyCL::btSoftbodyCL(btSoftBody* softbody) : m_pSoftBodyCPU(softbody), m_bDeformable(true), m_Gravity(0.0f, -9.8f, 0.0f), m_dt(0.0f), m_bShowBV(false), m_Margin(0.01)
-{
-	assert(softbody);
-
-	m_Kst = 0.95f;
-	m_Kb = 0.4f;
-	m_Kd = 0.0f;
-	m_Mu = 0.3f;
-	
-	m_bEqualVertexMass = true;
-	m_NumIterForConstraintSolver = 7;
-
-	 m_numBatchStretchSpring = 0;
-	 m_numBatchBendingSpring = 0;
-		
-	 // nodes
-	 int index = 0;
-	 for ( int i = 0; i < softbody->m_nodes.size(); i++ )
-	 {
-		btSoftbodyNodeCL nodeCl;
-		nodeCl.m_Index = index++;
-		nodeCl.m_Pos = softbody->m_nodes[i].m_x;
-		nodeCl.m_PosNext = nodeCl.m_Pos;
-		nodeCl.m_Vel = softbody->m_nodes[i].m_v;
-		nodeCl.m_InvMass = softbody->m_nodes[i].m_im;
-		softbody->m_nodes[i].m_tag = (void*)nodeCl.m_Index;
-		m_VertexArray.push_back(nodeCl);
-	 }
-	
-	 // faces
-	 for ( int i = 0; i < softbody->m_faces.size(); i++ )
-	 {
-		 btSoftbodyTriangleCL faceCl;
-
-		 faceCl.SetVertexIndex(0, (int)softbody->m_faces[i].m_n[0]->m_tag);
-		 faceCl.SetVertexIndex(1, (int)softbody->m_faces[i].m_n[1]->m_tag);
-		 faceCl.SetVertexIndex(2, (int)softbody->m_faces[i].m_n[2]->m_tag);
-		 faceCl.m_Index = (int)m_TriangleArray.size();
-		 m_TriangleArray.push_back(faceCl);
-	}
-	
-	 if ( m_VertexArray.size() > 0 )
-		fillSpringArray();
-}
-
-btSoftbodyCL::btSoftbodyCL(const btSoftbodyCL& other)
-{
-	m_Kst = other.m_Kst;
-	m_Kb = other.m_Kb;
-	m_Kd = other.m_Kd;
-	m_Gravity = other.m_Gravity;
-
-	m_VertexArray = other.m_VertexArray;
-	m_StrechSpringArray = other.m_StrechSpringArray;
-	m_BendSpringArray = other.m_BendSpringArray;
-	m_TriangleArray = other.m_TriangleArray;
-
-	m_bDeformable = other.m_bDeformable;
-	m_bEqualVertexMass = other.m_bEqualVertexMass;
-	m_bShowBV = other.m_bShowBV;
 }
 
 btSoftbodyCL::~btSoftbodyCL(void)
@@ -114,110 +44,8 @@ void btSoftbodyCL::initialize()
 {
 	m_bDeformable = true;
 
-	initializeBoundingVolumes();
-}
-
-bool btSoftbodyCL::load(const char* filename)
-{
-	// Loading wavefront obj file.
-	ifstream inFile(filename);
-	string sLine;
-	vector<string> sTokens;
-
-	if ( !inFile.is_open() )
-		return false;
-
-	m_VertexArray.clear();
-	m_StrechSpringArray.clear();
-	m_BendSpringArray.clear();
-
-	while (!inFile.eof() )
-	{
-		getline(inFile, sLine);
-		sTokens.clear(); 
-		int numFound = StringTokenizer(sLine, string(" "), sTokens, false);
-
-		if ( numFound == 0 )
-			continue;
-
-		vector <string>::iterator iter;
-		string sToken; 
-
-		iter = sTokens.begin();
-		sToken = *(iter);
-		
-		if ( sToken == "#" ) // comment
-			continue;
-		else if ( sToken == "v" ) // vertex
-		{
-			btVector3 pnt;
-			
-			// x
-			++iter;
-			sToken = (*iter);			
-			pnt[0] = (float)atof(sToken.c_str());
-
-			// y
-			++iter;
-			sToken = (*iter);			
-			pnt[1] = (float)atof(sToken.c_str());
-
-			// z
-			++iter;
-			sToken = (*iter);			
-			pnt[2] = (float)atof(sToken.c_str());
-
-			btSoftbodyNodeCL vert;
-			vert.m_Pos = pnt;
-
-			m_VertexArray.push_back(vert);
-		}
-		else if ( sToken == "vn" ) // vertex normal
-		{
-			// skip this.
-		}
-		else if ( sToken == "f" ) // face
-		{
-			btSoftbodyTriangleCL tri;
-			vector<string> sTokens2;
-
-			int i = 0;
-
-			for ( iter = sTokens.begin() + 1; iter != sTokens.end(); iter++ )
-			{
-				sToken = (*iter);
-				sTokens2.clear();
-				numFound = StringTokenizer(sToken, string("/"), sTokens2, false);
-
-				if ( numFound > 0 )
-				{
-					tri.m_IndexVrx[i++] = atoi(sTokens2[0].c_str())-1;
-				}
-				else if ( numFound == 0 && sToken != "" )
-				{
-					tri.m_IndexVrx[i++] = atoi(sToken.c_str())-1;
-				}
-			}		
-
-			tri.m_Index = (int)m_TriangleArray.size();
-			m_TriangleArray.push_back(tri);	
-		}		
-	}
-
-	inFile.close();
-	
-	// Set up indexes for vertices
-	int index = 0;
-	for ( int i = 0; i < m_VertexArray.size(); i++ )
-	{
-		btSoftbodyNodeCL& vert = m_VertexArray[i];
-		vert.m_Index = index;
-		index++;
-	}
-	
 	fillSpringArray();
-		
-	return true;
+	initializeBoundingVolumes();
 }
 
 void btSoftbodyCL::fillSpringArray()
@@ -264,7 +92,7 @@ void btSoftbodyCL::fillSpringArray()
 			int iterEdge = m_StrechSpringArray.findLinearSearch(edge);
 
 			if ( iterEdge == m_StrechSpringArray.size() )
-				assert(0); // must not reach here!
+				b3Assert(0); // must not reach here!
 
 			tri.m_IndexEdge[i] = m_StrechSpringArray[iterEdge].GetIndex();
 		}		
@@ -274,8 +102,8 @@ void btSoftbodyCL::fillSpringArray()
 	for ( int iterEdge = 0; iterEdge < m_StrechSpringArray.size(); iterEdge++ )
 	{
 		btSoftbodyLinkCL& edge = m_StrechSpringArray[iterEdge];
-		const btVector3& ver0 = m_VertexArray[edge.GetVertexIndex(0)].m_Pos;
-		const btVector3& ver1 = m_VertexArray[edge.GetVertexIndex(1)].m_Pos;
+		const b3Vector3& ver0 = m_VertexArray[edge.GetVertexIndex(0)].m_Pos;
+		const b3Vector3& ver1 = m_VertexArray[edge.GetVertexIndex(1)].m_Pos;
 
 		edge.SetRestLength((ver0 - ver1).length());
 	}
@@ -286,8 +114,8 @@ void btSoftbodyCL::fillSpringArray()
 	for ( int iterEdge = 0; iterEdge < m_StrechSpringArray.size(); iterEdge++ )
 	{
 		const btSoftbodyLinkCL& edge = m_StrechSpringArray[iterEdge];
-		const btVector3& ver0 = m_VertexArray[edge.GetVertexIndex(0)].m_Pos;
-		const btVector3& ver1 = m_VertexArray[edge.GetVertexIndex(1)].m_Pos;
+		const b3Vector3& ver0 = m_VertexArray[edge.GetVertexIndex(0)].m_Pos;
+		const b3Vector3& ver1 = m_VertexArray[edge.GetVertexIndex(1)].m_Pos;
 
 		int indexTri0 = edge.m_IndexTriangle[0];
 		int indexTri1 = edge.m_IndexTriangle[1];
@@ -315,7 +143,7 @@ void btSoftbodyCL::fillSpringArray()
 			else if ( tri1.GetVertexIndex(2) != edge.GetVertexIndex(0) && tri1.GetVertexIndex(2) != edge.GetVertexIndex(1) )
 				indexVer1 = tri1.GetVertexIndex(2);
 
-			assert(indexVer0 != -1 && indexVer1 != -1);
+			b3Assert(indexVer0 != -1 && indexVer1 != -1);
 
 			btSoftbodyLinkCL bendSpring(indexVer0, indexVer1);
 			int iterCheck = m_BendSpringArray.findLinearSearch(bendSpring);
@@ -333,8 +161,8 @@ void btSoftbodyCL::fillSpringArray()
 	for ( int iterEdge = 0; iterEdge < m_BendSpringArray.size(); iterEdge++ )
 	{
 		btSoftbodyLinkCL& edge = m_BendSpringArray[iterEdge];
-		const btVector3& ver0 = m_VertexArray[edge.GetVertexIndex(0)].m_Pos;
-		const btVector3& ver1 = m_VertexArray[edge.GetVertexIndex(1)].m_Pos;
+		const b3Vector3& ver0 = m_VertexArray[edge.GetVertexIndex(0)].m_Pos;
+		const b3Vector3& ver1 = m_VertexArray[edge.GetVertexIndex(1)].m_Pos;
 
 		edge.SetRestLength((ver0 - ver1).length());
 	}
@@ -370,12 +198,12 @@ void btSoftbodyCL::fillSpringArray()
 	}
 }
 
-void btSoftbodyCL::setGravity(const btVector3& gravity)
+void btSoftbodyCL::setGravity(const b3Vector3& gravity)
 {
 	m_Gravity = gravity;
 }
 
-const btVector3& btSoftbodyCL::GetGravity() const
+const b3Vector3& btSoftbodyCL::GetGravity() const
 {
 	return m_Gravity;
 }
@@ -384,7 +212,7 @@ void btSoftbodyCL::setVertexMass(float vertexMass)
 {
 	m_bEqualVertexMass = true;
 
-	assert(vertexMass > 0 );
+	b3Assert(vertexMass > 0 );
 
 	float invMass =  1.0f / vertexMass;
 
@@ -397,7 +225,7 @@ void btSoftbodyCL::setVertexMass(float vertexMass)
 
 void btSoftbodyCL::setTotalMass(float totalMass)
 {
-	assert(totalMass > 0);
+	b3Assert(totalMass > 0);
 
 	m_bEqualVertexMass = true;
 
@@ -538,7 +366,7 @@ void btSoftbodyCL::generateBatches()
 			}				
 		}
 
-		assert(!bFound0 && !bFound1);
+		b3Assert(!bFound0 && !bFound1);
 	}
 #endif
 
@@ -569,7 +397,7 @@ void btSoftbodyCL::generateBatches()
 			btSoftbodyLinkCL& springNext = m_StrechSpringArray[i+1];
 
 #ifdef _DEBUG
-			assert(spring.m_Coloring <= springNext.m_Coloring);
+			b3Assert(spring.m_Coloring <= springNext.m_Coloring);
 #endif
 
 			if ( spring.m_Coloring < springNext.m_Coloring )
@@ -587,7 +415,7 @@ void btSoftbodyCL::generateBatches()
 
 		for ( int j = startIndex; j <= endIndex; j++ )
 		{
-			assert(m_StrechSpringArray[j].m_Coloring == m_StrechSpringArray[startIndex].m_Coloring);
+			b3Assert(m_StrechSpringArray[j].m_Coloring == m_StrechSpringArray[startIndex].m_Coloring);
 		}
 	}
 #endif
@@ -693,7 +521,7 @@ void btSoftbodyCL::generateBatches()
 			}				
 		}
 
-		assert(!bFound0 && !bFound1);
+		b3Assert(!bFound0 && !bFound1);
 	}
 #endif
 
@@ -725,7 +553,7 @@ void btSoftbodyCL::generateBatches()
 			btSoftbodyLinkCL& springNext = m_BendSpringArray[i+1];
 
 #ifdef _DEBUG
-			assert(spring.m_Coloring <= springNext.m_Coloring);
+			b3Assert(spring.m_Coloring <= springNext.m_Coloring);
 #endif
 
 			if ( spring.m_Coloring < springNext.m_Coloring )
@@ -743,7 +571,7 @@ void btSoftbodyCL::generateBatches()
 
 		for ( int j = startIndex; j <= endIndex; j++ )
 		{
-			assert(m_BendSpringArray[j].m_Coloring == m_BendSpringArray[startIndex].m_Coloring);
+			b3Assert(m_BendSpringArray[j].m_Coloring == m_BendSpringArray[startIndex].m_Coloring);
 		}
 	}
 #endif
@@ -772,7 +600,7 @@ void btSoftbodyCL::clearForces()
 	for ( int i = 0; i < (int)m_VertexArray.size(); i++ )
 	{
 		btSoftbodyNodeCL& vert = m_VertexArray[i];		
-		vert.m_Accel = btVector3(0, 0, 0);
+		vert.m_Accel = b3Vector3(0, 0, 0);
 	}
 }
 
@@ -801,15 +629,15 @@ void btSoftbodyCL::enforceEdgeConstraints(float k, float dt)
 		btSoftbodyNodeCL& vert0 = m_VertexArray[spring.GetVertexIndex(0)];
 		btSoftbodyNodeCL& vert1 = m_VertexArray[spring.GetVertexIndex(1)];
 
-		btVector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
+		b3Vector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
 
 		float newLen = vecNewSpring.length();
 		float restLen = spring.GetRestLength();
 
-		btVector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
+		b3Vector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
 
-		btVector3 dVert0(0, 0, 0);
-		btVector3 dVert1(0, 0, 0);			
+		b3Vector3 dVert0(0, 0, 0);
+		b3Vector3 dVert1(0, 0, 0);			
 
 		dVert0 = -cji * vert0.m_InvMass;
 		dVert1 = cji * vert1.m_InvMass;
@@ -835,15 +663,15 @@ void btSoftbodyCL::enforceBendingConstraints(float k, float dt)
 		btSoftbodyNodeCL& vert0 = m_VertexArray[spring.GetVertexIndex(0)];
 		btSoftbodyNodeCL& vert1 = m_VertexArray[spring.GetVertexIndex(1)];
 
-		btVector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
+		b3Vector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
 
 		float newLen = vecNewSpring.length();
 		float restLen = spring.GetRestLength();
 
-		btVector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
+		b3Vector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
 
-		btVector3 dVert0(0, 0, 0);
-		btVector3 dVert1(0, 0, 0);			
+		b3Vector3 dVert0(0, 0, 0);
+		b3Vector3 dVert1(0, 0, 0);			
 
 		dVert0 = -cji * vert0.m_InvMass;
 		dVert1 = cji * vert1.m_InvMass;
@@ -873,15 +701,15 @@ void btSoftbodyCL::enforceEdgeConstraintsBatched(float k, float dt)
 			btSoftbodyNodeCL& vert0 = m_VertexArray[spring.GetVertexIndex(0)];
 			btSoftbodyNodeCL& vert1 = m_VertexArray[spring.GetVertexIndex(1)];
 			
-			btVector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
+			b3Vector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
 
 			float newLen = vecNewSpring.length();
 			float restLen = spring.GetRestLength();
 
-			btVector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
+			b3Vector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
 
-			btVector3 dVert0(0, 0, 0);
-			btVector3 dVert1(0, 0, 0);			
+			b3Vector3 dVert0(0, 0, 0);
+			b3Vector3 dVert1(0, 0, 0);			
 
 			dVert0 = -cji * vert0.m_InvMass;
 			dVert1 = cji * vert1.m_InvMass;
@@ -913,15 +741,15 @@ void btSoftbodyCL::enforceBendingConstraintsBatched(float k, float dt)
 			btSoftbodyNodeCL& vert0 = m_VertexArray[spring.GetVertexIndex(0)];
 			btSoftbodyNodeCL& vert1 = m_VertexArray[spring.GetVertexIndex(1)];
 
-			btVector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
+			b3Vector3 vecNewSpring = vert0.m_PosNext - vert1.m_PosNext;
 
 			float newLen = vecNewSpring.length();
 			float restLen = spring.GetRestLength();
 
-			btVector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
+			b3Vector3 cji = (newLen-restLen)*vecNewSpring.normalize() / (vert0.m_InvMass + vert1.m_InvMass);
 
-			btVector3 dVert0(0, 0, 0);
-			btVector3 dVert1(0, 0, 0);			
+			b3Vector3 dVert0(0, 0, 0);
+			b3Vector3 dVert1(0, 0, 0);			
 		
 			dVert0 = -cji * vert0.m_InvMass;
 			dVert1 = cji * vert1.m_InvMass;
@@ -957,9 +785,9 @@ bool btSoftbodyCL::integrate(float dt)
 	applyForces(dt);
 	computeNextVertexPositions(dt);
 
-	assert(m_NumIterForConstraintSolver > 0 );
-	assert(0 <= m_Kst && m_Kst <= 1.0);
-	assert(0 <= m_Kb && m_Kb <= 1.0);
+	b3Assert(m_NumIterForConstraintSolver > 0 );
+	b3Assert(0 <= m_Kst && m_Kst <= 1.0);
+	b3Assert(0 <= m_Kb && m_Kb <= 1.0);
 
 	float Kst = 1.0f - pow((1.0f - m_Kst), 1.0f/m_NumIterForConstraintSolver);
 	float Kb = 1.0f - pow((1.0f - m_Kb), 1.0f/m_NumIterForConstraintSolver);
@@ -1018,7 +846,7 @@ void btSoftbodyCL::initializeBoundingVolumes()
 
 void btSoftbodyCL::updateBoundingVolumes(float dt)
 {
-	assert(m_AABBVertexArray.size() == m_VertexArray.size());
+	b3Assert(m_AABBVertexArray.size() == m_VertexArray.size());
 
 	m_Aabb.Empty();
 
@@ -1035,36 +863,6 @@ void btSoftbodyCL::updateBoundingVolumes(float dt)
 	}
 }
 
-void btSoftbodyCL::updateSoftBodyCPU()
-{
-	if ( !m_pSoftBodyCPU )
-		return;
-
-	for ( int i = 0; i < m_pSoftBodyCPU->m_nodes.size(); i++ )
-	 {
-		m_pSoftBodyCPU->m_nodes[i].m_x = m_VertexArray[i].m_Pos;
-	 }
-}
-
-btSoftbodyCL& btSoftbodyCL::operator=(const btSoftbodyCL& other) 
-{ 
-	m_Kst = other.m_Kst;
-	m_Kb = other.m_Kb;
-	m_Kd = other.m_Kd;
-
-	// ToDo: Need to do something with m_pBVHTree
-
-	m_VertexArray = other.m_VertexArray;
-	m_StrechSpringArray = other.m_StrechSpringArray;
-	m_BendSpringArray = other.m_BendSpringArray;
-	m_TriangleArray = other.m_TriangleArray;
-
-	m_bDeformable = other.m_bDeformable;
-	m_bEqualVertexMass = other.m_bEqualVertexMass;
-	m_bShowBV = other.m_bShowBV;
-
-	return *this; 
-}
 
 
 

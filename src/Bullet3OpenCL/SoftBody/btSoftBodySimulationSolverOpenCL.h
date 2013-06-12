@@ -3,8 +3,8 @@
 
 #include "../Initialize/b3OpenCLInclude.h"
 
-#include "LinearMath\btVector3.h"
-#include "LinearMath\btAlignedObjectArray.h"
+#include "Bullet3Common/b3Vector3.h"
+#include "Bullet3Common/b3AlignedObjectArray.h"
 #include "..\NarrowphaseCollision\b3ConvexPolyhedronCL.h"
 
 class btSoftbodyCL;
@@ -24,9 +24,9 @@ public:
 	btSoftbodyCL* m_pMergedSoftBody;
 
 protected:
-	btAlignedObjectArray<btSoftbodyCL*> m_clothArray;
-	btAlignedObjectArray<btSoftbodyCL*> m_tempClothArray;
-	btVector3 m_Gravity;
+	b3AlignedObjectArray<btSoftbodyCL*> m_clothArray;
+	b3AlignedObjectArray<btSoftbodyCL*> m_tempClothArray;
+	b3Vector3 m_Gravity;
 	int m_NumIterForConstraintSolver;
 
 	int m_numVertices;
@@ -35,8 +35,8 @@ protected:
 	int m_numClothes;
 
 	// for batches
-	btAlignedObjectArray<int> m_BatchStretchSpringIndexGlobalArray; // index is global
-	btAlignedObjectArray<int> m_BatchBendSpringIndexGlobalArray; // index is global
+	b3AlignedObjectArray<int> m_BatchStretchSpringIndexGlobalArray; // index is global
+	b3AlignedObjectArray<int> m_BatchBendSpringIndexGlobalArray; // index is global
 	void generateBatches(bool bBatchEachSoftBodyFirst = false); 
 	void mergeSoftBodies();
 
@@ -77,7 +77,7 @@ protected:
 	int getBendingSpringIndexGlobal(int bendingSpringIndexLocal, int clothIndex);
 
 public:
-	void setGravity(const btVector3& gravity) { m_Gravity = gravity; }
+	void setGravity(const b3Vector3& gravity) { m_Gravity = gravity; }
 
 	void initialize();
 	bool integrate(float dt);
@@ -88,8 +88,8 @@ public:
 	void updateBoundingVolumes(float dt);
 	bool readBackFromGPU();
 		
-	btAlignedObjectArray<btSoftbodyCL*>& getSoftBodies() { return m_clothArray; }
-	const btAlignedObjectArray<btSoftbodyCL*>& getSoftBodies() const { return m_clothArray; }
+	b3AlignedObjectArray<btSoftbodyCL*>& getSoftBodies() { return m_clothArray; }
+	const b3AlignedObjectArray<btSoftbodyCL*>& getSoftBodies() const { return m_clothArray; }
 	void addSoftBody(btSoftbodyCL* pCloth);
 };
 

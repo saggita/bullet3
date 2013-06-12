@@ -98,7 +98,7 @@ float4s ToFloat4s(float x, float y, float z, float w = 0.f)
 }
 
 __inline
-float4s ToFloat4s(const btVector3& vec)
+float4s ToFloat4s(const b3Vector3& vec)
 {
 	float4s v;
 	v.x = vec[0]; v.y = vec[1]; v.z = vec[2]; v.w = 0.f;
@@ -106,9 +106,9 @@ float4s ToFloat4s(const btVector3& vec)
 }
 
 __inline
-btVector3 TobtVector3(const float4s& f4s)
+b3Vector3 TobtVector3(const float4s& f4s)
 {
-	return btVector3(f4s.x, f4s.y, f4s.z);
+	return b3Vector3(f4s.x, f4s.y, f4s.z);
 }
 
 inline float clamp(float val, float low, float high)
@@ -145,7 +145,7 @@ m_DBClothInfo(NULL), m_pMergedSoftBody(NULL), m_HBLinkCL(NULL)
 	m_UpdateClothBoundingVolumeKernel = NULL;
 	m_ResolveCollisionKernel = NULL;
 
-	m_Gravity = btVector3(0, -9.8f, 0);
+	m_Gravity = b3Vector3(0, -9.8f, 0);
 	m_NumIterForConstraintSolver = 10;
 }
 
@@ -334,7 +334,7 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 		{
 			// vertex index
 			btSoftbodyNodeCL& vert = pCloth->getVertexArray()[vertIndexLocal];
-			assert(vert.m_Index == vertIndexLocal);
+			b3Assert(vert.m_Index == vertIndexLocal);
 			vert.m_Index = getVertexIndexGlobal(vert.m_Index, clothIndex);
 
 			// convert connected stretch spring indexes
@@ -403,9 +403,9 @@ void btSoftBodySimulationSolverOpenCL::mergeSoftBodies()
 		}
 	}
 
-	btAssert(m_numVertices == m_pMergedSoftBody->getVertexArray().size());
-	btAssert(m_numStretchSprings == m_pMergedSoftBody->getStrechSpringArray().size());
-	btAssert(m_numBendingSprings == m_pMergedSoftBody->getBendSpringArray().size());
+	b3Assert(m_numVertices == m_pMergedSoftBody->getVertexArray().size());
+	b3Assert(m_numStretchSprings == m_pMergedSoftBody->getStrechSpringArray().size());
+	b3Assert(m_numBendingSprings == m_pMergedSoftBody->getBendSpringArray().size());
 
 	// clear temporary softbodyq objects. 
 	for ( int i = 0; i < m_tempClothArray.size(); i++ )
@@ -444,7 +444,7 @@ void btSoftBodySimulationSolverOpenCL::generateBatches(bool bBatchEachSoftBodyFi
 	//for ( int i = 0; i < m_numClothes; i++ )
 	//{
 	//	btSoftbodyCL* pCloth = m_clothArray[i];
-	//	const btAlignedObjectArray<int>& batchSprings = pCloth->GetBatchStretchSpringIndexArray();
+	//	const b3AlignedObjectArray<int>& batchSprings = pCloth->GetBatchStretchSpringIndexArray();
 
 	//	for ( int j = 0; j < batchSprings.size(); j++ )
 	//	{
@@ -459,7 +459,7 @@ void btSoftBodySimulationSolverOpenCL::generateBatches(bool bBatchEachSoftBodyFi
 	//for ( int i = 0; i < m_numClothes; i++ )
 	//{
 	//	btSoftbodyCL* pCloth = m_clothArray[i];
-	//	const btAlignedObjectArray<int>& batchSprings = pCloth->GetBatchBendSpringIndexArray();
+	//	const b3AlignedObjectArray<int>& batchSprings = pCloth->GetBatchBendSpringIndexArray();
 
 	//	for ( int j = 0; j < batchSprings.size(); j++ )
 	//	{
@@ -474,14 +474,14 @@ void btSoftBodySimulationSolverOpenCL::updateBuffers()
 	if ( m_numVertices == 0 )
 		return;
 
-	assert(m_pMergedSoftBody != NULL);
+	b3Assert(m_pMergedSoftBody != NULL);
 	cl_int result;
 
 	//-----------------------
 	// Buffer for cloth info
 	//-----------------------
 	result = clEnqueueWriteBuffer(m_queue, m_DBClothInfo, CL_TRUE, 0, sizeof(btSoftBodyInfoCL) * m_numClothes, m_HBClothInfoCL, 0, NULL, NULL);
-	assert(result == CL_SUCCESS);
+	b3Assert(result == CL_SUCCESS);
 
 	//---------------------
 	// Buffer for vertices
@@ -504,7 +504,7 @@ void btSoftBodySimulationSolverOpenCL::updateBuffers()
 	}		
 	
 	result = clEnqueueWriteBuffer(m_queue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
-	assert(result == CL_SUCCESS);	
+	b3Assert(result == CL_SUCCESS);	
 
 	//----------------------------
 	// Buffer for stretch springs
@@ -525,7 +525,7 @@ void btSoftBodySimulationSolverOpenCL::updateBuffers()
 	}
 
 	result = clEnqueueWriteBuffer(m_queue, m_DBStrechSprings, CL_TRUE, 0, sizeof(btSoftBodySpringCL) * m_numStretchSprings, m_HBStretchSpringCL, 0, NULL, NULL);
-	assert(result == CL_SUCCESS);
+	b3Assert(result == CL_SUCCESS);
 
 	//----------------------------
 	// Buffer for bending springs
@@ -546,7 +546,7 @@ void btSoftBodySimulationSolverOpenCL::updateBuffers()
 	}
 		
 	result = clEnqueueWriteBuffer(m_queue, m_DBBendSprings, CL_TRUE, 0, sizeof(btSoftBodySpringCL) * m_numBendingSprings, m_HBBendSpringCL, 0, NULL, NULL);
-	assert(result == CL_SUCCESS);
+	b3Assert(result == CL_SUCCESS);
 }
 
 int btSoftBodySimulationSolverOpenCL::getVertexIndexGlobal(int vertexIndexLocal, int clothIndex)
@@ -578,7 +578,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 		ciErrNum = clSetKernelArg(m_ClearForcesKernel, 1, sizeof(float), &dt);
 		ciErrNum = clSetKernelArg(m_ClearForcesKernel, 2, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -598,7 +598,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 		ciErrNum = clSetKernelArg(m_ApplyGravityKernel, 2, sizeof(float), &dt);
 		ciErrNum = clSetKernelArg(m_ApplyGravityKernel, 3, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -615,7 +615,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 		ciErrNum = clSetKernelArg(m_ApplyForcesKernel, 1, sizeof(float), &dt);
 		ciErrNum = clSetKernelArg(m_ApplyForcesKernel, 2, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -632,7 +632,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 		ciErrNum = clSetKernelArg(m_ClearForcesKernel, 1, sizeof(float), &dt);
 		ciErrNum = clSetKernelArg(m_ClearForcesKernel, 2, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -649,7 +649,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 		ciErrNum = clSetKernelArg(m_ComputeNextVertexPositionsKernel, 1, sizeof(float), &dt);
 		ciErrNum = clSetKernelArg(m_ComputeNextVertexPositionsKernel, 2, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -662,8 +662,8 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 	//-------------------------------
 
 	// below code should be moved to kernel
-	//assert(0 <= m_pCloth->m_Kst && m_pCloth->m_Kst <= 1.0f);
-	//assert(0 <= m_pCloth->m_Kb && m_pCloth->m_Kb <= 1.0f);
+	//b3Assert(0 <= m_pCloth->m_Kst && m_pCloth->m_Kst <= 1.0f);
+	//b3Assert(0 <= m_pCloth->m_Kb && m_pCloth->m_Kb <= 1.0f);
 
 	//float Kst = 1.0f - pow((1.0f - m_pCloth->m_Kst), 1.0f/m_pCloth->m_NumIterForConstraintSolver);
 	//float Kb = 1.0f - pow((1.0f - m_pCloth->m_Kb), 1.0f/m_pCloth->m_NumIterForConstraintSolver);
@@ -696,7 +696,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 			ciErrNum = clSetKernelArg(m_EnforceEdgeConstraintsKernel, 5, sizeof(cl_mem), &m_DBVertices);
 			ciErrNum = clSetKernelArg(m_EnforceEdgeConstraintsKernel, 6, sizeof(cl_mem), &m_DBStrechSprings);
 		
-			assert(ciErrNum == CL_SUCCESS);
+			b3Assert(ciErrNum == CL_SUCCESS);
 		
 			size_t m_defaultWorkGroupSize = 64;
 			size_t numWorkItems = m_defaultWorkGroupSize*((numSpringsInBatch + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -723,7 +723,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 			ciErrNum = clSetKernelArg(m_EnforceEdgeConstraintsKernel, 5, sizeof(cl_mem), &m_DBVertices);
 			ciErrNum = clSetKernelArg(m_EnforceEdgeConstraintsKernel, 6, sizeof(cl_mem), &m_DBBendSprings);
 		
-			assert(ciErrNum == CL_SUCCESS);
+			b3Assert(ciErrNum == CL_SUCCESS);
 		
 			size_t m_defaultWorkGroupSize = 64;
 			size_t numWorkItems = m_defaultWorkGroupSize*((numSpringsInBatch + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -745,7 +745,7 @@ bool btSoftBodySimulationSolverOpenCL::integrate(float dt)
 		ciErrNum = clSetKernelArg(m_UpdateVelocitiesKernel, 1, sizeof(float), &dt);
 		ciErrNum = clSetKernelArg(m_UpdateVelocitiesKernel, 2, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -770,7 +770,7 @@ bool btSoftBodySimulationSolverOpenCL::advancePosition(float dt)
 		ciErrNum = clSetKernelArg(m_AdvancePositionKernel, 1, sizeof(float), &dt);
 		ciErrNum = clSetKernelArg(m_AdvancePositionKernel, 2, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -813,7 +813,7 @@ bool btSoftBodySimulationSolverOpenCL::resolveCollision(float dt)
 	//	ciErrNum = clSetKernelArg(m_ResolveCollisionKernel, 8, sizeof(cl_mem), (void*)(&convexIndices));
 	//	ciErrNum = clSetKernelArg(m_ResolveCollisionKernel, 9, sizeof(cl_mem), (void*)(&convexVertices));
 
-	//	assert(ciErrNum == CL_SUCCESS);
+	//	b3Assert(ciErrNum == CL_SUCCESS);
 	//	
 	//	size_t m_defaultWorkGroupSize = 64;
 	//	size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -825,16 +825,16 @@ bool btSoftBodySimulationSolverOpenCL::resolveCollision(float dt)
 }
 
 // Assumes planeEqn[0], planeEqn[1] and planeEqn[2] forms unit normal vector.
-btScalar signedDistanceFromPointToPlane(const btVector3& point, const btScalar* planeEqn, btVector3* closestPointInFace/* = NULL*/)
+b3Scalar signedDistanceFromPointToPlane(const b3Vector3& point, const b3Scalar* planeEqn, b3Vector3* closestPointInFace/* = NULL*/)
 {
-	btVector3 n(planeEqn[0], planeEqn[1], planeEqn[2]);
+	b3Vector3 n(planeEqn[0], planeEqn[1], planeEqn[2]);
 
 	if ( n.length2() < 1e-6 )
 		return 0;
 
-	if ( point == btVector3(0, 0, 0) )
+	if ( point == b3Vector3(0, 0, 0) )
 	{
-		btScalar dist = planeEqn[3];
+		b3Scalar dist = planeEqn[3];
 
 		if ( closestPointInFace )
 			*closestPointInFace = - dist * n;
@@ -843,7 +843,7 @@ btScalar signedDistanceFromPointToPlane(const btVector3& point, const btScalar* 
 	}
 	else
 	{
-		btScalar dist = btDot(n, point) + planeEqn[3];
+		b3Scalar dist = b3Dot(n, point) + planeEqn[3];
 
 		if ( closestPointInFace )
 			*closestPointInFace = point - dist * n;
@@ -857,19 +857,19 @@ bool btSoftBodySimulationSolverOpenCL::resolveCollisionCPU(float dt)
 	//ReadBackFromGPU();
 
 	//const CustomDispatchData* narrowphaseData = narrowphaseAndSolver->getCustomDispatchData();
-	//const btAlignedObjectArray<RigidBodyBase::Body>& bodyArrayCPU = *narrowphaseData->m_bodyBufferCPU;
-	//const btAlignedObjectArray<btCollidable>& collidables = narrowphaseData->m_collidablesCPU;
-	//const btAlignedObjectArray<ConvexPolyhedronCL>& convexPolyhedra = narrowphaseData->m_convexPolyhedra;
-	//const btAlignedObjectArray<btGpuFace>& faces = narrowphaseData->m_convexFaces;
-	//const btAlignedObjectArray<int>& convexIndices = narrowphaseData->m_convexIndices;
-	//const btAlignedObjectArray<btVector3>& convexVertices = narrowphaseData->m_convexVertices;
+	//const b3AlignedObjectArray<RigidBodyBase::Body>& bodyArrayCPU = *narrowphaseData->m_bodyBufferCPU;
+	//const b3AlignedObjectArray<btCollidable>& collidables = narrowphaseData->m_collidablesCPU;
+	//const b3AlignedObjectArray<ConvexPolyhedronCL>& convexPolyhedra = narrowphaseData->m_convexPolyhedra;
+	//const b3AlignedObjectArray<btGpuFace>& faces = narrowphaseData->m_convexFaces;
+	//const b3AlignedObjectArray<int>& convexIndices = narrowphaseData->m_convexIndices;
+	//const b3AlignedObjectArray<b3Vector3>& convexVertices = narrowphaseData->m_convexVertices;
 
 	//for ( int index = 0; index < m_numVertices; index++ )
 	//{
 	//	btSoftBodyVertexCL& vertexData = m_HBVertexCL[index];
 	//	index++;
 
-	//	btVector3 vertPos = btVector3(vertexData.m_Pos.x, vertexData.m_Pos.y, vertexData.m_Pos.z);
+	//	b3Vector3 vertPos = b3Vector3(vertexData.m_Pos.x, vertexData.m_Pos.y, vertexData.m_Pos.z);
 
 	//	// check if vertex is colliding with rigidbody using face info from convex polyhedron.
 	//	
@@ -880,7 +880,7 @@ bool btSoftBodySimulationSolverOpenCL::resolveCollisionCPU(float dt)
 
 	//		u32 collidableIndex = body.m_collidableIdx;
 
-	//		btVector3 pos(body.m_pos.x, body.m_pos.y, body.m_pos.z);
+	//		b3Vector3 pos(body.m_pos.x, body.m_pos.y, body.m_pos.z);
 	//		btQuaternion rot(body.m_quat.x, body.m_quat.y, body.m_quat.z, body.m_quat.w);
 	//		
 	//		btTransform tr(rot, pos);
@@ -890,30 +890,30 @@ bool btSoftBodySimulationSolverOpenCL::resolveCollisionCPU(float dt)
 	//		const ConvexPolyhedronCL& convexShape = convexPolyhedra[shapeIndex];
 
 	//		int numFaces = convexShape.m_numFaces;			
-	//		btTransform trRot(rot, btVector3(0, 0, 0));
-	//		btVector3 closestPnt;
+	//		btTransform trRot(rot, b3Vector3(0, 0, 0));
+	//		b3Vector3 closestPnt;
 	//		float minDist = -BT_LARGE_FLOAT;
 	//		bool bCollide = true;
 
 	//		for ( int f = 0; f < numFaces; f++ ) 
 	//		{
 	//			// plane equation
-	//			btScalar planeEqn[4];
+	//			b3Scalar planeEqn[4];
 
 	//			const btGpuFace& face = faces[convexShape.m_faceOffset + f];
-	//			btVector3 n(face.m_plane.x, face.m_plane.y, face.m_plane.z);
+	//			b3Vector3 n(face.m_plane.x, face.m_plane.y, face.m_plane.z);
 	//			n = trRot*n;
 
 	//			planeEqn[0] = n[0];
 	//			planeEqn[1] = n[1];
 	//			planeEqn[2] = n[2];
 	//							
-	//			btVector3 v = tr * convexVertices[convexShape.m_vertexOffset + convexIndices[face.m_indexOffset + 0]];
+	//			b3Vector3 v = tr * convexVertices[convexShape.m_vertexOffset + convexIndices[face.m_indexOffset + 0]];
 
 	//			planeEqn[3] = -btDot(n, v);
 
-	//			btVector3 pntReturn;
-	//			btScalar dist = signedDistanceFromPointToPlane(vertPos, planeEqn, &pntReturn);
+	//			b3Vector3 pntReturn;
+	//			b3Scalar dist = signedDistanceFromPointToPlane(vertPos, planeEqn, &pntReturn);
 
 	//			// If the distance is positive, the plane is a separating plane. 
 	//			if ( dist > 0 )
@@ -934,14 +934,14 @@ bool btSoftBodySimulationSolverOpenCL::resolveCollisionCPU(float dt)
 	//		{
 	//			vertexData.m_Pos = ToFloat4s(closestPnt);
 	//			vertexData.m_PosNext = vertexData.m_Pos;
-	//			vertexData.m_Vel = ToFloat4s(btVector3(0, 0, 0)); // TODO: the velocity should be the one from the closted point.
+	//			vertexData.m_Vel = ToFloat4s(b3Vector3(0, 0, 0)); // TODO: the velocity should be the one from the closted point.
 	//		}
 	//	}
 	//	
 	//}
 
 	//cl_int result = clEnqueueWriteBuffer(m_queue, m_DBVertices, CL_TRUE, 0, sizeof(btSoftBodyVertexCL) * m_numVertices, m_HBVertexCL, 0, NULL, NULL);
-	//assert(result == CL_SUCCESS);
+	//b3Assert(result == CL_SUCCESS);
 
 	return true;
 }
@@ -979,14 +979,14 @@ bool btSoftBodySimulationSolverOpenCL::readBackFromGPU()
 			const btSoftBodyVertexCL& vertexData = m_HBVertexCL[index];
 			index++;
 
-			pCloth->m_VertexArray[j].m_Pos = btVector3(vertexData.m_Pos.x, vertexData.m_Pos.y, vertexData.m_Pos.z);
-			pCloth->m_VertexArray[j].m_PosNext = btVector3(vertexData.m_PosNext.x, vertexData.m_PosNext.y, vertexData.m_PosNext.z);
-			pCloth->m_VertexArray[j].m_Vel = btVector3(vertexData.m_Vel.x, vertexData.m_Vel.y, vertexData.m_Vel.z);
-			pCloth->m_AABBVertexArray[j].Min() = btVector3(vertexData.m_AABBMin.x, vertexData.m_AABBMin.y, vertexData.m_AABBMin.z);
-			pCloth->m_AABBVertexArray[j].Max() = btVector3(vertexData.m_AABBMax.x, vertexData.m_AABBMax.y, vertexData.m_AABBMax.z);
+			pCloth->m_VertexArray[j].m_Pos = b3Vector3(vertexData.m_Pos.x, vertexData.m_Pos.y, vertexData.m_Pos.z);
+			pCloth->m_VertexArray[j].m_PosNext = b3Vector3(vertexData.m_PosNext.x, vertexData.m_PosNext.y, vertexData.m_PosNext.z);
+			pCloth->m_VertexArray[j].m_Vel = b3Vector3(vertexData.m_Vel.x, vertexData.m_Vel.y, vertexData.m_Vel.z);
+			pCloth->m_AABBVertexArray[j].Min() = b3Vector3(vertexData.m_AABBMin.x, vertexData.m_AABBMin.y, vertexData.m_AABBMin.z);
+			pCloth->m_AABBVertexArray[j].Max() = b3Vector3(vertexData.m_AABBMax.x, vertexData.m_AABBMax.y, vertexData.m_AABBMax.z);
 		}
 
-		pCloth->updateSoftBodyCPU();
+		//pCloth->updateSoftBodyCPU();
 
 		pCloth->m_Aabb.Min() = TobtVector3(m_HBClothInfoCL[i].m_AABBMin);
 		pCloth->m_Aabb.Max() = TobtVector3(m_HBClothInfoCL[i].m_AABBMax);
@@ -1032,7 +1032,7 @@ void btSoftBodySimulationSolverOpenCL::updateBoundingVolumes(float dt)
 		ciErrNum = clSetKernelArg(m_UpdateVertexBoundingVolumeKernel, 2, sizeof(cl_mem), &m_DBVertices);
 		ciErrNum = clSetKernelArg(m_UpdateVertexBoundingVolumeKernel, 3, sizeof(cl_mem), &m_DBClothInfo);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numVertices + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);
@@ -1051,7 +1051,7 @@ void btSoftBodySimulationSolverOpenCL::updateBoundingVolumes(float dt)
 		ciErrNum = clSetKernelArg(m_UpdateClothBoundingVolumeKernel, 1, sizeof(cl_mem), &m_DBClothInfo);
 		ciErrNum = clSetKernelArg(m_UpdateClothBoundingVolumeKernel, 2, sizeof(cl_mem), &m_DBVertices);
 
-		assert(ciErrNum == CL_SUCCESS);
+		b3Assert(ciErrNum == CL_SUCCESS);
 		
 		size_t m_defaultWorkGroupSize = 64;
 		size_t numWorkItems = m_defaultWorkGroupSize*((m_numClothes + (m_defaultWorkGroupSize-1)) / m_defaultWorkGroupSize);

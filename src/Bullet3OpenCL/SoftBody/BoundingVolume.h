@@ -1,6 +1,7 @@
-#pragma once
+#ifndef B3_IBOUNDING_VOLUME_H
+#define B3_IBOUNDING_VOLUME_H
 
-class btVector3;
+class b3Vector3;
 
 class IBoundingVolume
 {
@@ -12,7 +13,7 @@ public:
 	virtual void Enlarge(float h) = 0;
 
 	virtual bool Collide(const IBoundingVolume& other, float tolerance = 0) const = 0;
-	virtual bool Inside(const btVector3& point) const = 0;
+	virtual bool Inside(const b3Vector3& point) const = 0;
 
 	virtual void Empty() = 0;
 	virtual bool IsEmpty() const = 0;
@@ -21,7 +22,7 @@ public:
 	virtual float Height() const = 0;
 	virtual float Width() const = 0;
 	virtual float Length() const = 0;
-	virtual btVector3 Center() const = 0;
+	virtual b3Vector3 Center() const = 0;
 	virtual float Volume() const = 0;
 	virtual int LongestSide() const = 0;
 
@@ -47,3 +48,4 @@ protected:
 	typedef CAabb CBoundingVolume;
 #endif
 
+#endif // B3_IBOUNDING_VOLUME_H

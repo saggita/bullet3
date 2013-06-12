@@ -75,59 +75,51 @@ void BasicGpuDemo::clientMoveAndDisplay()
 		// draw softbodies
 		const btSoftBodySimulationSolverOpenCL* softbodySolverCL = ((b3GpuDynamicsWorld*)m_dynamicsWorld)->getSoftBodySolverCL();
 
-		if ( softbodySolverCL )
+		for ( int i = 0; i < ((b3GpuDynamicsWorld*)m_dynamicsWorld)->getSoftBodies().size(); i++ )
 		{
-			for ( int i = 0; i < softbodySolverCL->getSoftBodies().size(); i++ )
-			{
-				btSoftBody* softbodyCPU = softbodySolverCL->getSoftBodies()[i]->getSoftBodyCPU();
+			btSoftBody* softbodyCPU = ((b3GpuDynamicsWorld*)m_dynamicsWorld)->getSoftBodies()[i];
 
-				int drawFlags = fDrawFlags::Links | fDrawFlags::Faces;
-				btSoftBodyHelpers::Draw(softbodyCPU, m_dynamicsWorld->getDebugDrawer(), drawFlags);
+			int drawFlags = fDrawFlags::Links | fDrawFlags::Faces;
+			btSoftBodyHelpers::Draw(softbodyCPU, m_dynamicsWorld->getDebugDrawer(), drawFlags);
 			
-				// draw AABB of softbody
-				
+			// draw AABB of softbody
+			b3Vector3 minAABB(softbodySolverCL->getSoftBodies()[i]->getAabb().Min());
+			b3Vector3 maxAABB(softbodySolverCL->getSoftBodies()[i]->getAabb().Max());
 
-				btVector3 minAABB(softbodySolverCL->getSoftBodies()[i]->getAabb().Min());
-				btVector3 maxAABB(softbodySolverCL->getSoftBodies()[i]->getAabb().Max());
+			glColor3f(1.0f, 1.0f, 1.0f);
 
-				glColor3f(1.0f, 1.0f, 1.0f);
+			glLineWidth(1.0);
 
-				glLineWidth(1.0);
+			glBegin(GL_LINE_STRIP);
+				glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
+				glVertex3d(maxAABB[0], minAABB[1], minAABB[2]);
+				glVertex3d(maxAABB[0], minAABB[1], maxAABB[2]);
+				glVertex3d(minAABB[0], minAABB[1], maxAABB[2]);
+				glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
+			glEnd();
 
-				glBegin(GL_LINE_STRIP);
-					glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
-					glVertex3d(maxAABB[0], minAABB[1], minAABB[2]);
-					glVertex3d(maxAABB[0], minAABB[1], maxAABB[2]);
-					glVertex3d(minAABB[0], minAABB[1], maxAABB[2]);
-					glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
-				glEnd();
+			glBegin(GL_LINE_STRIP);
+				glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
+				glVertex3d(maxAABB[0], maxAABB[1], minAABB[2]);
+				glVertex3d(maxAABB[0], maxAABB[1], maxAABB[2]);
+				glVertex3d(minAABB[0], maxAABB[1], maxAABB[2]);
+				glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
+			glEnd();
 
-				glBegin(GL_LINE_STRIP);
-					glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
-					glVertex3d(maxAABB[0], maxAABB[1], minAABB[2]);
-					glVertex3d(maxAABB[0], maxAABB[1], maxAABB[2]);
-					glVertex3d(minAABB[0], maxAABB[1], maxAABB[2]);
-					glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
-				glEnd();
+			glBegin(GL_LINES);
+				glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
+				glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
 
-				glBegin(GL_LINES);
-					glVertex3d(minAABB[0], minAABB[1], minAABB[2]);
-					glVertex3d(minAABB[0], maxAABB[1], minAABB[2]);
+				glVertex3d(maxAABB[0], minAABB[1], minAABB[2]);
+				glVertex3d(maxAABB[0], maxAABB[1], minAABB[2]);
 
-					glVertex3d(maxAABB[0], minAABB[1], minAABB[2]);
-					glVertex3d(maxAABB[0], maxAABB[1], minAABB[2]);
+				glVertex3d(maxAABB[0], minAABB[1], maxAABB[2]);
+				glVertex3d(maxAABB[0], maxAABB[1], maxAABB[2]);
 
-					glVertex3d(maxAABB[0], minAABB[1], maxAABB[2]);
-					glVertex3d(maxAABB[0], maxAABB[1], maxAABB[2]);
-
-					glVertex3d(minAABB[0], minAABB[1], maxAABB[2]);
-					glVertex3d(minAABB[0], maxAABB[1], maxAABB[2]);
-				glEnd();
-
-
-			}
+				glVertex3d(minAABB[0], minAABB[1], maxAABB[2]);
+				glVertex3d(minAABB[0], maxAABB[1], maxAABB[2]);
+			glEnd();
 		}
-
 	}
 		
 	renderme(); 
@@ -534,7 +526,7 @@ void	BasicGpuDemo::initPhysics()
 		m_dynamicsWorld->addRigidBody(body);
 	}
 	
-	
+	if ( 0 )
 	{
 		//create a few dynamic rigidbodies
 		// Re-using the same collision is better for memory usage and performance
@@ -583,6 +575,34 @@ void	BasicGpuDemo::initPhysics()
 				}
 			}
 		}
+	}
+
+	// a few rigidbodies
+	{
+		btBoxShape* colShape = new btBoxShape(btVector3(5.0f, 5.0f, 5.0f));
+		m_collisionShapes.push_back(colShape);
+
+		/// Create Dynamic Objects
+		btTransform tr;
+		tr.setIdentity();
+
+		tr.setOrigin(btVector3(0, 10.f, 0));
+
+		btScalar	mass(1.f);
+
+		//rigidbody is dynamic if and only if mass is non zero, otherwise static
+		bool isDynamic = (mass != 0.f);
+
+		btVector3 localInertia(0,0,0);
+
+		if (isDynamic)
+			colShape->calculateLocalInertia(mass,localInertia);
+
+		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass,0,colShape,localInertia);
+					btRigidBody* body = new btRigidBody(rbInfo);
+					
+		body->setWorldTransform(tr);
+		m_dynamicsWorld->addRigidBody(body);
 	}
 
 	// softbody
