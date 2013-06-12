@@ -9,24 +9,14 @@
 
 #define B3_SOFTBODY_KERNELS_PATH "src/Bullet3OpenCL/SoftBody/kernels/SoftBodyKernals.cl"
 	
-#define _MEM_CLASSALIGN16 __declspec(align(16))
-#define _MEM_ALIGNED_ALLOCATOR16 	void* operator new(size_t size) { return _aligned_malloc( size, 16 ); } \
-	void operator delete(void *p) { _aligned_free( p ); } \
-	void* operator new[](size_t size) { return _aligned_malloc( size, 16 ); } \
-	void operator delete[](void *p) { _aligned_free( p ); } \
-	void* operator new(size_t size, void* p) { return p; } \
-	void operator delete(void *p, void* pp) {} 
-
-
 struct float4s
 {	
 	float x,y,z,w;		
 };
 
-_MEM_CLASSALIGN16
-struct btSoftBodyVertexCL
+B3_ATTRIBUTE_ALIGNED16(struct) btSoftBodyVertexCL
 {
-	_MEM_ALIGNED_ALLOCATOR16;
+	B3_DECLARE_ALIGNED_ALLOCATOR();
 	
 	float4s m_Pos;
 	float4s m_PosNext;
@@ -43,10 +33,9 @@ struct btSoftBodyVertexCL
 	unsigned int m_ClothIndex;
 };
 
-_MEM_CLASSALIGN16
-struct btSoftBodySpringCL
-{	
-	_MEM_ALIGNED_ALLOCATOR16;
+B3_ATTRIBUTE_ALIGNED16(struct) btSoftBodySpringCL
+{
+	B3_DECLARE_ALIGNED_ALLOCATOR();
 	
 	unsigned int m_Index; // local index. Only unique inside the cloth which it belongs to.
 	unsigned int m_IndexGlobal; // global index
@@ -58,19 +47,18 @@ struct btSoftBodySpringCL
 	unsigned int m_ClothIndex;
 };
 
-_MEM_CLASSALIGN16
-struct btSoftBodyLinkCL
+
+B3_ATTRIBUTE_ALIGNED16(struct) btSoftBodyLinkCL
 {
-	_MEM_ALIGNED_ALLOCATOR16;
+	B3_DECLARE_ALIGNED_ALLOCATOR();
 
 	unsigned int m_Index;
 	float4s m_Pos;
 };
 
-_MEM_CLASSALIGN16
-struct btSoftBodyInfoCL
+B3_ATTRIBUTE_ALIGNED16(struct) btSoftBodyInfoCL
 {
-	_MEM_ALIGNED_ALLOCATOR16;
+	B3_DECLARE_ALIGNED_ALLOCATOR();
 	
 	unsigned int m_Index;
 	unsigned int m_NumVertices;
