@@ -19,14 +19,15 @@ class b3GpuDynamicsWorld : public btDynamicsWorld
 	btAlignedObjectArray<const class  btCollisionShape*> m_uniqueShapes;
 	btAlignedObjectArray<int> m_uniqueShapeMapping;
 
-
+public:
 	class b3GpuRigidBodyPipeline* m_rigidBodyPipeline;
 	class b3GpuNarrowPhase* m_np;
 	class b3GpuSapBroadphase* m_bp;
 
 	class btSoftBodySimulationSolverOpenCL* m_softbodySolver;
 	btAlignedObjectArray<btSoftBody*> m_softbodies;
-	
+private:	
+
 	btVector3			m_gravity;
 	bool	m_cpuGpuSync;
 	

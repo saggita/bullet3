@@ -53,10 +53,17 @@ subject to the following restrictions:
 #include "vectormath/vmInclude.h"
 #include "BulletSoftBody/btSoftBodyHelpers.h"
 
+#include "../Wavefront/objLoader.h"
+//#include "../../Demos/GimpactTestDemo/TorusMesh.h"
+//#include "../../Demos/GimpactTestDemo/BunnyMesh.h"
+
+
 #include <stdio.h> //printf debugging
 #include "GLDebugDrawer.h"
 
 static GLDebugDrawer gDebugDraw;
+
+static btTriangleIndexVertexArray* g_indexVertexArrays = 0;
 
 void BasicGpuDemo::clientMoveAndDisplay()
 {
@@ -475,6 +482,7 @@ void	BasicGpuDemo::initPhysics()
 //	btCollisionShape* groundShape = new btStaticPlaneShape(btVector3(0,1,0),50);
 	
 	m_collisionShapes.push_back(groundShape);
+
 	if (0)
 	{
 		btTransform tr;
@@ -502,6 +510,7 @@ void	BasicGpuDemo::initPhysics()
 
 
 	}
+
 	btTransform groundTransform;
 	groundTransform.setIdentity();
 	groundTransform.setOrigin(btVector3(0,-50,0));
@@ -577,16 +586,17 @@ void	BasicGpuDemo::initPhysics()
 		}
 	}
 
-	// a few rigidbodies
+	// one box shape rigidbody
+	if ( 1 )
 	{
-		btBoxShape* colShape = new btBoxShape(btVector3(5.0f, 5.0f, 5.0f));
+		btBoxShape* colShape = new btBoxShape(btVector3(4.0f, 4.0f, 4.0f));
 		m_collisionShapes.push_back(colShape);
 
 		/// Create Dynamic Objects
 		btTransform tr;
 		tr.setIdentity();
 
-		tr.setOrigin(btVector3(0, 10.f, 0));
+		tr.setOrigin(btVector3(10, 25.f, 10));
 
 		btScalar	mass(1.f);
 
@@ -605,7 +615,158 @@ void	BasicGpuDemo::initPhysics()
 		m_dynamicsWorld->addRigidBody(body);
 	}
 
+	// One sphere shape
+	if ( 1 )
+	{
+		btSphereShape* colShape = new btSphereShape(4.0f);
+		m_collisionShapes.push_back(colShape);
+
+		/// Create Dynamic Objects
+		btTransform tr;
+		tr.setIdentity();
+
+		tr.setOrigin(btVector3(-16, 25.f, 10));
+
+		btScalar	mass(1.f);
+
+		//rigidbody is dynamic if and only if mass is non zero, otherwise static
+		bool isDynamic = (mass != 0.f);
+
+		btVector3 localInertia(0,0,0);
+
+		if (isDynamic)
+			colShape->calculateLocalInertia(mass,localInertia);
+
+		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass,0,colShape,localInertia);
+					btRigidBody* body = new btRigidBody(rbInfo);
+					
+		body->setWorldTransform(tr);
+		m_dynamicsWorld->addRigidBody(body);
+	}
+
+	//--------------------------
+	// triangle mesh rigidbody
+	//--------------------------
+	if ( 1 )
+	{
+		//char* fileName = "data/teddy.obj";
+		char* fileName = "data/samurai_monastry.obj";
+		objLoader* obj = new objLoader();
+	
+		FILE* f = 0;
+
+		char relativeFileName[1024];
+		{
+			const char* prefix[]={"./","../","../../","../../../","../../../../"};
+			int numPrefixes = sizeof(prefix)/sizeof(char*);
+
+			for (int i=0;i<numPrefixes;i++)
+			{
+			
+				sprintf(relativeFileName,"%s%s",prefix[i],fileName);
+				f = fopen(relativeFileName,"r");
+				if (f)
+				{
+					break;
+				}
+			}
+		}
+
+		b3Assert(f);
+
+		fclose(f);
+		f=0;
+
+		obj->load(relativeFileName);
+
+		// Create mesh vertices and face vertex indices from obj loader
+		b3AlignedObjectArray<int> indices;
+		int numOfTriangles = obj->faceCount;
+
+		btTriangleMesh* trimesh = new btTriangleMesh();
+
+
+		for (int f=0;f<obj->faceCount;f++)
+		{
+			obj_face* face = obj->faceList[f];
+
+			if (face->vertex_count>=3)
+			{
+				b3Vector3 normal(0,1,0);
+				int vtxBaseIndex = 0;
+
+				if (face->vertex_count == 3)
+				{
+					indices.push_back(vtxBaseIndex);
+					indices.push_back(vtxBaseIndex+1);
+					indices.push_back(vtxBaseIndex+2);
+					
+					b3Vector3 v0;
+					v0[0] = obj->vertexList[face->vertex_index[0]]->e[0];
+					v0[1] = obj->vertexList[face->vertex_index[0]]->e[1];
+					v0[2] = obj->vertexList[face->vertex_index[0]]->e[2];
+					v0[3] = 0.f;
+						
+					b3Vector3 v1;
+					v1[0] = obj->vertexList[face->vertex_index[1]]->e[0];
+					v1[1] = obj->vertexList[face->vertex_index[1]]->e[1];
+					v1[2] = obj->vertexList[face->vertex_index[1]]->e[2];
+					v1[3] = 0.f;
+
+					b3Vector3 v2;
+					v2[0] = obj->vertexList[face->vertex_index[2]]->e[0];
+					v2[1] = obj->vertexList[face->vertex_index[2]]->e[1];
+					v2[2] = obj->vertexList[face->vertex_index[2]]->e[2];
+					v2[3] = 0.f;
+
+					normal = (v1-v0).cross(v2-v0);
+					normal.normalize();
+
+					trimesh->addTriangle(btVector3(v0.x, v0.y, v0.z), btVector3(v1.x, v1.y, v1.z), btVector3(v2.x, v2.y, v2.z) );
+				}
+				else
+				{
+					// Only triangle face yet. 
+					b3Assert(0);
+				}
+			}
+		}
+
+		g_indexVertexArrays = trimesh;
+
+		bool useQuantizedAabbCompression = true;
+		btVector3 aabbMin(-1000,-1000,-1000),aabbMax(1000,1000,1000);
+		btBvhTriangleMeshShape* trimeshShape = new btBvhTriangleMeshShape(g_indexVertexArrays,useQuantizedAabbCompression,aabbMin,aabbMax);
+
+		m_collisionShapes.push_back(trimeshShape);
+
+		/// Create Dynamic Objects
+		btTransform tr;
+		tr.setIdentity();
+
+		tr.setOrigin(btVector3(0, 5.f, 0));
+
+		// only static rigidbody for triange mesh shape
+		btScalar	mass(0.f);
+
+		//rigidbody is dynamic if and only if mass is non zero, otherwise static
+		bool isDynamic = (mass != 0.f);
+
+		btVector3 localInertia(0,0,0);
+
+		if (isDynamic)
+			trimeshShape->calculateLocalInertia(mass,localInertia);
+
+		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass,0, trimeshShape, localInertia);
+		btRigidBody* body = new btRigidBody(rbInfo);
+					
+		body->setWorldTransform(tr);
+		m_dynamicsWorld->addRigidBody(body);
+	}
+
+	//----------
 	// softbody
+	//----------
 	int numOfFlags = 10;
 	float xTranslateFlags = 15;
 

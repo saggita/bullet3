@@ -301,11 +301,95 @@ int b3GpuDynamicsWorld::findOrRegisterCollisionShape(const btCollisionShape* col
 						
 							int gpuShapeIndex = m_np->registerPlaneShape((b3Vector3&)plane->getPlaneNormal(),plane->getPlaneConstant());
 							m_uniqueShapeMapping.push_back(gpuShapeIndex);
-						} else
+						} 
+						else
 						{
-							printf("Error: unsupported shape type (%d) in b3GpuDynamicsWorld::addRigidBody\n",colShape->getShapeType());
-							index = -1;
-							b3Assert(0);
+							if (colShape->getShapeType()==SOFTBODY_SHAPE_PROXYTYPE)
+							{
+								//m_uniqueShapes.push_back(colShape);
+				
+								//btBvhTriangleMeshShape* trimesh = (btBvhTriangleMeshShape*) colShape;
+								//btStridingMeshInterface* meshInterface = trimesh->getMeshInterface();
+								//b3AlignedObjectArray<b3Vector3> vertices;
+								//b3AlignedObjectArray<int> indices;
+				
+								//btVector3 trimeshScaling(1,1,1);
+								//for (int partId=0;partId<meshInterface->getNumSubParts();partId++)
+								//{
+					
+								//	const unsigned char *vertexbase = 0;
+								//	int numverts = 0;
+								//	PHY_ScalarType type = PHY_INTEGER;
+								//	int stride = 0;
+								//	const unsigned char *indexbase = 0;
+								//	int indexstride = 0;
+								//	int numfaces = 0;
+								//	PHY_ScalarType indicestype = PHY_INTEGER;
+								//	//PHY_ScalarType indexType=0;
+					
+								//	b3Vector3 triangleVerts[3];
+								//	meshInterface->getLockedReadOnlyVertexIndexBase(&vertexbase,numverts,	type,stride,&indexbase,indexstride,numfaces,indicestype,partId);
+								//	btVector3 aabbMin,aabbMax;
+					
+								//	for (int triangleIndex = 0 ; triangleIndex < numfaces;triangleIndex++)
+								//	{
+								//		unsigned int* gfxbase = (unsigned int*)(indexbase+triangleIndex*indexstride);
+						
+								//		for (int j=2;j>=0;j--)
+								//		{
+							
+								//			int graphicsindex = indicestype==PHY_SHORT?((unsigned short*)gfxbase)[j]:gfxbase[j];
+								//			if (type == PHY_FLOAT)
+								//			{
+								//				float* graphicsbase = (float*)(vertexbase+graphicsindex*stride);
+								//				triangleVerts[j] = b3Vector3(
+								//											 graphicsbase[0]*trimeshScaling.getX(),
+								//											 graphicsbase[1]*trimeshScaling.getY(),
+								//											 graphicsbase[2]*trimeshScaling.getZ());
+								//			}
+								//			else
+								//			{
+								//				double* graphicsbase = (double*)(vertexbase+graphicsindex*stride);
+								//				triangleVerts[j] = b3Vector3( btScalar(graphicsbase[0]*trimeshScaling.getX()),
+								//											 btScalar(graphicsbase[1]*trimeshScaling.getY()),
+								//											 btScalar(graphicsbase[2]*trimeshScaling.getZ()));
+								//			}
+								//		}
+								//		vertices.push_back(triangleVerts[0]);
+								//		vertices.push_back(triangleVerts[1]);
+								//		vertices.push_back(triangleVerts[2]);
+								//		indices.push_back(indices.size());
+								//		indices.push_back(indices.size());
+								//		indices.push_back(indices.size());
+								//	}
+								//}
+								////GraphicsShape* gfxShape = 0;//b3BulletDataExtractor::createGraphicsShapeFromWavefrontObj(objData);
+				
+								////GraphicsShape* gfxShape = b3BulletDataExtractor::createGraphicsShapeFromConvexHull(&sUnitSpherePoints[0],MY_UNITSPHERE_POINTS);
+								//float meshScaling[4] = {1,1,1,1};
+								////int shapeIndex = renderer.registerShape(gfxShape->m_vertices,gfxShape->m_numvertices,gfxShape->m_indices,gfxShape->m_numIndices);
+								////float groundPos[4] = {0,0,0,0};
+				
+								////renderer.registerGraphicsInstance(shapeIndex,groundPos,rotOrn,color,meshScaling);
+								//if (vertices.size() && indices.size())
+								//{
+								//	int gpuShapeIndex = m_np->registerConcaveMesh(&vertices,&indices, meshScaling);
+								//	m_uniqueShapeMapping.push_back(gpuShapeIndex);
+								//} else
+								//{
+								//	printf("Error: no vertices in mesh in b3GpuDynamicsWorld::addRigidBody\n");
+								//	index = -1;
+								//	b3Assert(0);
+								//}
+				
+				
+							}
+							else
+							{
+								printf("Error: unsupported shape type (%d) in b3GpuDynamicsWorld::addRigidBody\n",colShape->getShapeType());
+								index = -1;
+								b3Assert(0);
+							}
 						}
 					}
 				}
@@ -341,6 +425,13 @@ void	b3GpuDynamicsWorld::addRigidBody(btRigidBody* body)
 
 void	b3GpuDynamicsWorld::addSoftBody(btSoftBody* body)
 {
+	m_cpuGpuSync = true;
+
+	int index = findOrRegisterCollisionShape(body->getCollisionShape());
+
+
+
+
 	btSoftbodyCL* softbodyCL = new btSoftbodyCL();
 	softbodyCL->setGravity(b3Vector3(getGravity().x(), getGravity().y(), getGravity().z()));
 	softbodyCL->setKb(0.45f); 
@@ -350,11 +441,11 @@ void	b3GpuDynamicsWorld::addSoftBody(btSoftBody* body)
 	softbodyCL->setMargin(0.1f);
 
 	// nodes
-	 int index = 0;
+	 int indexNode = 0;
 	 for ( int i = 0; i < body->m_nodes.size(); i++ )
 	 {
 		btSoftbodyNodeCL nodeCl;
-		nodeCl.m_Index = index++;
+		nodeCl.m_Index = indexNode++;
 		nodeCl.m_Pos = b3Vector3(body->m_nodes[i].m_x.x(), body->m_nodes[i].m_x.y(), body->m_nodes[i].m_x.z());
 		nodeCl.m_PosNext = nodeCl.m_Pos;
 		nodeCl.m_Vel = b3Vector3(body->m_nodes[i].m_v.x(), body->m_nodes[i].m_v.y(), body->m_nodes[i].m_v.z());
